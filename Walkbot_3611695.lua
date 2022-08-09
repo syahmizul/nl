@@ -1537,13 +1537,7 @@ local function MoveToTarget(cmd)
     AngleToNode.x = 0.0
     view_angles.z = 0.0
     AngleToNode.z = 0.0
-
-    -- view_angles:NormalizeTo360()
-    -- AngleToNode:NormalizeTo360()
-
-    -- view_angles:PrintValueClean()
-    -- AngleToNode:PrintValueClean()
-    AngleToNode = (view_angles - AngleToNode) -- AngleToNode - view_angles if the game's angles is clock wise , which is not happening but putting this here anyway.
+    AngleToNode = (view_angles - AngleToNode) -- AngleToNode - view_angles if the game's angles is clock wise
 
 
 
