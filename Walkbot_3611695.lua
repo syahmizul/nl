@@ -1543,7 +1543,7 @@ local function MoveToTarget(cmd)
 
     -- view_angles:PrintValueClean()
     -- AngleToNode:PrintValueClean()
-    AngleToNode = (view_angles - AngleToNode) -- AngleToNode - view_angles if the game's angles is clock wise
+    AngleToNode = (view_angles - AngleToNode) -- AngleToNode - view_angles if the game's angles is clock wise , which is not happening but putting this here anyway.
 
 
 
