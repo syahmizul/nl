@@ -1149,15 +1149,18 @@ local function FindNearestPlayer(FromPlayer)
     local FromPlayerPos = Vector3D:new(FromPlayerRenderOrigin.x,FromPlayerRenderOrigin.y,FromPlayerRenderOrigin.z)
 
     for _,Player in ipairs(PlayerList) do
-        if Player ~= FromPlayer and Player:IsPlayer() and Player:IsAlive() and not Player:IsTeamMate() and not ( Player:GetNetworkState() == -1 or Player:GetNetworkState() == 4 )then
-            local PlayerRenderOrigin = Player:GetRenderOrigin()
-            local PlayerPos = Vector3D:new(PlayerRenderOrigin.x,PlayerRenderOrigin.y,PlayerRenderOrigin.z)
+        if Player ~= FromPlayer and Player:IsPlayer() then
+            if Player:GetPlayer():IsAlive() and not Player:GetPlayer():IsTeamMate() and not Player:GetPlayer():IsDormant() then
+                local PlayerOrigin = Player:GetProp("m_vecOrigin")
+                local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
-            local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
-            if( DistanceToFromPlayer < NearestDistance) then
-                NearestDistance = DistanceToFromPlayer
-                NearestPlayer = Player
+                local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
+                if( DistanceToFromPlayer < NearestDistance) then
+                    NearestDistance = DistanceToFromPlayer
+                    NearestPlayer = Player
+                end
             end
+            
         end
     end
 
@@ -1171,6 +1174,8 @@ local EndArea = nil
 local CurrentNode = nil
 local Path = {}
 
+local NodeToSkip = {}
+local PlayersToSkip = {}
 local function PrepareToFindAnotherNode()
 
     math.randomseed(GlobalVars.tickcount)
@@ -1216,7 +1221,8 @@ local function PrepareToFindAnotherNode()
     --print(#OpenList)
     table.insert(OpenList,StartingNode)
     --end
-
+    NodeToSkip = {}
+    PlayersToSkip = {}
 end
 
 local NeedToResetLists = true
@@ -1385,7 +1391,7 @@ end
 local MovingTicks = 1
 local NotMovingTicks = 1
 
-local ThresholdTime = 5 -- time to switch between avoidance methods
+local ThresholdTime = 1 -- time to switch between avoidance methods
 local ThresholdTimeReset = 1 -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
 
 local CycleAttempt = 0 -- 8 methods
@@ -1495,7 +1501,7 @@ local function ObstacleAvoid(cmd)
             AntiAim.OverrideYawOffset(AngleToVectorUse.y)
 
             if(traced.hit_entity and traced.hit_entity:IsPlayer()) then
-                if(traced.hit_entity:IsTeamMate()) then
+                if(traced.hit_entity:GetPlayer():IsTeamMate()) then
                     return
                 end
             end
@@ -1611,58 +1617,61 @@ end
 
 --local iteration = 0
 local LastMapName = nil
+local ShouldStop = false
 
 Cheat.RegisterCallback("pre_prediction", function(cmd)
 
    --FindPath()
+    local game_rules = EntityList.GetGameRules()
+    local m_bWarmupPeriod = game_rules:GetProp("m_bWarmupPeriod")
 
-   if (GlobalVars.tickcount % 64 == 0) then
-        if (EngineClient.GetLevelNameShort() ~= LastMapName) then
-            print("Map changed.")
-            INavFile.m_isLoaded = false
-            OpenList = { }
-            ClosedList = { }
-            CurrentNode = nil
-            Path = { }
-            NeedToResetLists = true
+    if (GlobalVars.tickcount % 64 == 0) then
+            if (EngineClient.GetLevelNameShort() ~= LastMapName) then
+                print("Map changed.")
+                INavFile.m_isLoaded = false
+                OpenList = { }
+                ClosedList = { }
+                CurrentNode = nil
+                Path = { }
+                NeedToResetLists = true
+            end
+    end
+
+    if (not INavFile.m_isLoaded) then
+        print("LoadMap : " .. EngineClient.GetLevelNameShort())
+        LoadMap(EngineClient.GetLevelNameShort())
+        LastMapName = EngineClient.GetLevelNameShort()
+        return
+    end
+
+    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not ShouldStop and not m_bWarmupPeriod then
+        --print("Iteration : ",iteration)
+        if(#Path == 0) then
+            if(NeedToResetLists)then
+                --print("PATH 0")
+                PrepareToFindAnotherNode()
+                NeedToResetLists = false
+            else
+                FindPath()
+                    cmd.forwardmove = 0.0
+                    cmd.sidemove = 0.0
+                    cmd.upmove = 0.0
+            end
+        else
+            --print("ELSE PATH 0")
+            MoveToTarget(cmd)
+            ObstacleAvoid(cmd)
+            CheckIfArrivedAtNode(cmd)
+
         end
-   end
+    end
+    FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
+    cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
+    cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
 
-   if (not INavFile.m_isLoaded) then
-       print("LoadMap : " .. EngineClient.GetLevelNameShort())
-       LoadMap(EngineClient.GetLevelNameShort())
-       LastMapName = EngineClient.GetLevelNameShort()
-       return
-   end
-
-   if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded then
-       --print("Iteration : ",iteration)
-       if(#Path == 0) then
-           if(NeedToResetLists)then
-               --print("PATH 0")
-               PrepareToFindAnotherNode()
-               NeedToResetLists = false
-           else
-               FindPath()
-                cmd.forwardmove = 0.0
-                cmd.sidemove = 0.0
-                cmd.upmove = 0.0
-           end
-       else
-           --print("ELSE PATH 0")
-           MoveToTarget(cmd)
-           ObstacleAvoid(cmd)
-           CheckIfArrivedAtNode(cmd)
-
-       end
-   end
-   FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
-   cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
-   cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
-
-   cmd.viewangles.pitch = Math:Clamp(cmd.viewangles.pitch ,-89,89)
-   cmd.viewangles.yaw = Math:Clamp(cmd.viewangles.yaw ,-180,180)
-   cmd.viewangles.roll = 0.0
+    cmd.viewangles.pitch = Math:Clamp(cmd.viewangles.pitch ,-89,89)
+    cmd.viewangles.yaw = Math:Clamp(cmd.viewangles.yaw ,-180,180)
+    cmd.viewangles.roll = 0.0
 end)
 local AutoQueue_Switch = Menu.Switch("Walkbot", "Auto queue", true, "Automatically queues for you.")
 local Queue = Panorama.LoadString([[
@@ -1772,9 +1781,31 @@ Cheat.RegisterCallback("draw", function()
         --end
     end
 end)
+
+
 Cheat.RegisterCallback("events", function(event)
 
     -- print(event:GetName())
+
+    if (event:GetName() == "round_prestart") then
+        ShouldStop = true
+        goto continue
+	end
+ 
+    -- if (event:GetName() == "round_end") then
+    --     IsWarmup = false
+    --     goto continue
+    -- end
+
+	if (event:GetName() == "round_freeze_end") then
+		ShouldStop = false
+        goto continue
+    end
+ 
+	if (event:GetName() == "round_end") then
+		ShouldStop = true
+        goto continue
+    end
 
     if(event:GetName() == "cs_game_disconnected") then
         print("cs_game_disconnected")
@@ -1784,7 +1815,9 @@ Cheat.RegisterCallback("events", function(event)
         CurrentNode = nil
         Path = { }
         NeedToResetLists = true
-    elseif (event:GetName() == "player_spawn") then
+        goto continue
+    end
+    if (event:GetName() == "player_spawn") then
         local local_player = EntityList.GetLocalPlayer()
         if local_player == nil then
             return
@@ -1806,8 +1839,9 @@ Cheat.RegisterCallback("events", function(event)
     --     CurrentNode = nil
     --     Path = { }
     --     NeedToResetLists = true
+        goto continue
     end
-
+    ::continue::
 end)
 
 
