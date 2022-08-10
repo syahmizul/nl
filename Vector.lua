@@ -65,7 +65,7 @@ function Vector3D:Zero()
 end
 
 --if the difference is higher than tolerance,THEN theres a difference
--- tolerance is like a radius
+-- limit is like a radius
 function Vector3D:IsDifference2D(v,limit)
     
     if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) then
@@ -78,6 +78,19 @@ function Vector3D:IsDifference2D(v,limit)
     return false
 end
 
+-- z limit should be more loose since we have less control over the z position
+function Vector3D:IsDifference3D(v,limit,z_limit)
+    
+    if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) or (math.abs(self.z - v.z) >= (z_limit or limit)) then
+        -- print("IsDifference true")
+        return true
+    end
+    -- print(math.abs(self.x - v.x))
+    -- print(math.abs(self.y - v.y))
+    -- print(math.abs(self.z - v.z))
+    -- print("IsDifference false")
+    return false
+end
 
 function Vector3D:SetMemberFromFloatType(FloatVariable)
 	self.x = FloatVariable[0]

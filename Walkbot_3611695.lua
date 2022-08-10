@@ -1069,7 +1069,7 @@ local function FindNearestAreaToPlayer(AreaList,player)
             goto continue  
         end
 
-        local Distance = Area.m_center:DistTo(player_position)
+        local Distance = Area.m_center:DistToSqr(player_position)
         if(Distance <= Latest_Distance) then
             Latest_Distance = Distance
             Nearest_Area = Area
@@ -1138,7 +1138,7 @@ local ClosedList = {}
 
 --table.insert(OpenList,StartingNode)
 
-
+local LastFoundPlayer = nil
 local function FindNearestPlayer(FromPlayer)
     local PlayerList = EntityList.GetPlayers()
 
@@ -1150,20 +1150,24 @@ local function FindNearestPlayer(FromPlayer)
 
     for _,Player in ipairs(PlayerList) do
         if Player ~= FromPlayer and Player:IsPlayer() then
-            if Player:GetPlayer():IsAlive() and not Player:GetPlayer():IsTeamMate() and not Player:GetPlayer():IsDormant() then
-                local PlayerOrigin = Player:GetProp("m_vecOrigin")
+            local BasePlayer = Player:GetPlayer()
+            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and BasePlayer:EntIndex() ~= LastFoundPlayer then
+                local PlayerOrigin = BasePlayer:GetProp("m_vecOrigin")
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
                 local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
                 if( DistanceToFromPlayer < NearestDistance) then
                     NearestDistance = DistanceToFromPlayer
-                    NearestPlayer = Player
+                    NearestPlayer = BasePlayer
                 end
             end
             
         end
     end
 
+    if(NearestPlayer ~= nil)then
+        LastFoundPlayer = NearestPlayer:EntIndex()
+    end
     return NearestPlayer
 end
 
@@ -1301,7 +1305,10 @@ local function FindPath()
 
 end
 
+Menu.Text("Walkbot","The settings below are advanced and it's optional to change them.")
 
+local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 20.0, 0.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
+local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 0.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
 
 local function CheckIfArrivedAtNode(cmd)
     local local_player = EntityList.GetLocalPlayer()
@@ -1309,7 +1316,7 @@ local function CheckIfArrivedAtNode(cmd)
 
     local NodeToMoveTo = Path[#Path]
     if(NodeToMoveTo ~= nil)then
-        if(NodeToMoveTo.area.m_center:DistTo2D(local_player_pos) <= 20.0)then
+        if(not NodeToMoveTo.area.m_center:IsDifference3D(local_player_pos,Difference2DLimit:Get(),Z_Limit:Get())) then
             --print("arrived at path")
             table.remove(Path,#Path)
             if(#Path == 0) then
@@ -1410,7 +1417,7 @@ local function ObstacleAvoid(cmd)
     local max_speed = 230.0
     if local_player_weapon then
         max_speed = local_player_weapon:GetMaxSpeed()
-    end 
+    end
     local local_player_speed = Vector3D:new(local_player:GetProp("m_vecVelocity[0]"),local_player:GetProp("m_vecVelocity[1]"),local_player:GetProp("m_vecVelocity[2]")):Length2D()
 
     -- if(LastLocation ~= nil) then
@@ -1679,7 +1686,7 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
     cmd.viewangles.yaw = Math:Clamp(cmd.viewangles.yaw ,-180,180)
     cmd.viewangles.roll = 0.0
 end)
-local AutoQueue_Switch = Menu.Switch("Walkbot", "Auto queue", true, "Automatically queues for you.")
+local AutoQueue_Switch = Menu.Switch("Misc", "Auto queue", true, "Automatically queues for you.")
 local Queue = Panorama.LoadString([[
     function queueMatchmaking() 
         {
