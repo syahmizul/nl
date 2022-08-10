@@ -1391,12 +1391,16 @@ end
 local MovingTicks = 1
 local NotMovingTicks = 1
 
-local ThresholdTime = 1 -- time to switch between avoidance methods
-local ThresholdTimeReset = 1 -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
+-- TODO : Use curtime / realtime instead of tickcount and get a better name for these namings and better descriptions
+-- TODO : Use better methods of keeping track of time instead of using these modulo operations
+local ThresholdTime = Menu.SliderInt("Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
+local ThresholdTimeReset = Menu.SliderInt("Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
 
-local CycleAttempt = 0 -- 8 methods
+local CycleAttempt = 1 
+local CycleMethods = 8
 -- local LastLocation = nil
 local function ObstacleAvoid(cmd)
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
 
     local local_player = EntityList.GetLocalPlayer()
     local local_player_pos = Vector3D:new()
@@ -1421,7 +1425,7 @@ local function ObstacleAvoid(cmd)
     -- print(local_player_speed >= 0.34 * max_speed)
     if(local_player_speed >= 0.10 * max_speed) then
         MovingTicks = (MovingTicks + 1) % 6400
-        if(MovingTicks % 64 * ThresholdTimeReset == 0) then
+        if(MovingTicks % tickrate * ThresholdTimeReset:Get() == 0) then
             CycleAttempt = 0
         end
         NotMovingTicks = 1
@@ -1430,8 +1434,8 @@ local function ObstacleAvoid(cmd)
         MovingTicks = 1
     end
 
-    if (GlobalVars.tickcount % (64 * ThresholdTime) == 0) then
-        CycleAttempt = (CycleAttempt + 1) % 8
+    if (GlobalVars.tickcount % (tickrate * ThresholdTime:Get()) == 0) then
+        CycleAttempt = CycleAttempt % CycleMethods + 1
     end
 
     -- print(CycleAttempt)
@@ -1440,7 +1444,7 @@ local function ObstacleAvoid(cmd)
     local NodeToMoveTo = Path[#Path]
     if(NotMovingTicks > 1) then
         --TODO : make a table and just loop through them by indexing using CycleAttempt
-        if( CycleAttempt == 0 )then -- Check attribute flags of areas
+        if( CycleAttempt == 1 )then -- Check attribute flags of areas
             if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then
                 Bhop(cmd) -- Jump
             end
@@ -1448,14 +1452,14 @@ local function ObstacleAvoid(cmd)
             if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_CROUCH) ~= 0) then
                 cmd.buttons = bit.bor(cmd.buttons,4) -- Crouch
             end
-        elseif ( CycleAttempt == 1 ) then -- Jump and crouch
+        elseif ( CycleAttempt == 2 ) then -- Jump and crouch
             Bhop(cmd)
             cmd.buttons = bit.bor(cmd.buttons,4)
-        elseif ( CycleAttempt == 2 ) then -- Just jump
+        elseif ( CycleAttempt == 3 ) then -- Just jump
             Bhop(cmd)
-        elseif ( CycleAttempt == 3 ) then -- Just crouch
+        elseif ( CycleAttempt == 4 ) then -- Just crouch
             cmd.buttons = bit.bor(cmd.buttons,4)
-        elseif ( CycleAttempt == 4 ) then -- IN_USE what's in front of us
+        elseif ( CycleAttempt == 5 ) then -- IN_USE what's in front of us
             local LocalEyePos = local_player:GetEyePosition()
             local LocalEyePosCustom = Vector3D:new()
             LocalEyePosCustom:CopyOther(LocalEyePos)
@@ -1478,7 +1482,7 @@ local function ObstacleAvoid(cmd)
 
             
             
-        elseif ( CycleAttempt == 5) then -- Shoot what's in front of us    
+        elseif ( CycleAttempt == 6) then -- Shoot what's in front of us    
             local LocalEyePos = local_player:GetEyePosition()
             local LocalEyePosCustom = Vector3D:new()
             LocalEyePosCustom:CopyOther(LocalEyePos)
@@ -1508,11 +1512,11 @@ local function ObstacleAvoid(cmd)
 
             cmd.buttons = bit.bor(cmd.buttons,1)
 
-        elseif ( CycleAttempt == 6) then
+        elseif ( CycleAttempt == 7) then
             -- do nothing
-        elseif ( CycleAttempt == 7) then -- Find another end area and new starting node
+        elseif ( CycleAttempt == 8) then -- Find another end area and new starting node
             Path = {}
-            CycleAttempt = 0 -- when path is found and CycleAttempt is still 7,it will attempt to find another end area,causing an infinite loop of finding paths and generating new end area.
+            CycleAttempt = 0 -- when path is found and CycleAttempt is still 8,it will attempt to find another end area,causing an infinite loop of finding paths and generating new end area.
             NeedToResetLists = true
         end
     else
@@ -1617,24 +1621,26 @@ end
 
 --local iteration = 0
 local LastMapName = nil
-local ShouldStop = false
+-- local ShouldStop = false
 
 Cheat.RegisterCallback("pre_prediction", function(cmd)
-
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
    --FindPath()
     local game_rules = EntityList.GetGameRules()
     local m_bWarmupPeriod = game_rules:GetProp("m_bWarmupPeriod")
+    local m_bFreezePeriod = game_rules:GetProp("m_bFreezePeriod")
+    -- local m_bIsValveDS = game_rules:GetProp("m_bIsValveDS")
 
-    if (GlobalVars.tickcount % 64 == 0) then
-            if (EngineClient.GetLevelNameShort() ~= LastMapName) then
-                print("Map changed.")
-                INavFile.m_isLoaded = false
-                OpenList = { }
-                ClosedList = { }
-                CurrentNode = nil
-                Path = { }
-                NeedToResetLists = true
-            end
+    if (GlobalVars.tickcount % tickrate == 0) then
+        if (EngineClient.GetLevelNameShort() ~= LastMapName) then
+            print("Map changed.")
+            INavFile.m_isLoaded = false
+            OpenList = { }
+            ClosedList = { }
+            CurrentNode = nil
+            Path = { }
+            NeedToResetLists = true
+        end
     end
 
     if (not INavFile.m_isLoaded) then
@@ -1644,7 +1650,7 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
         return
     end
 
-    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not ShouldStop and not m_bWarmupPeriod then
+    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded --[[ and not ShouldStop ]] and not((GlobalVars.m_bRemoteClient and m_bWarmupPeriod) or m_bFreezePeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
         --print("Iteration : ",iteration)
         if(#Path == 0) then
             if(NeedToResetLists)then
@@ -1653,9 +1659,9 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
                 NeedToResetLists = false
             else
                 FindPath()
-                    cmd.forwardmove = 0.0
-                    cmd.sidemove = 0.0
-                    cmd.upmove = 0.0
+                cmd.forwardmove = 0.0
+                cmd.sidemove = 0.0
+                cmd.upmove = 0.0
             end
         else
             --print("ELSE PATH 0")
@@ -1787,25 +1793,25 @@ Cheat.RegisterCallback("events", function(event)
 
     -- print(event:GetName())
 
-    if (event:GetName() == "round_prestart") then
-        ShouldStop = true
-        goto continue
-	end
+    -- if (event:GetName() == "round_prestart") then
+    --     ShouldStop = true
+    --     goto continue
+	-- end
  
     -- if (event:GetName() == "round_end") then
     --     IsWarmup = false
     --     goto continue
     -- end
 
-	if (event:GetName() == "round_freeze_end") then
-		ShouldStop = false
-        goto continue
-    end
+	-- if (event:GetName() == "round_freeze_end") then
+	-- 	ShouldStop = false
+    --     goto continue
+    -- end
  
-	if (event:GetName() == "round_end") then
-		ShouldStop = true
-        goto continue
-    end
+	-- if (event:GetName() == "round_end") then
+	-- 	ShouldStop = true
+    --     goto continue
+    -- end
 
     if(event:GetName() == "cs_game_disconnected") then
         print("cs_game_disconnected")
