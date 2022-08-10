@@ -287,7 +287,7 @@ local function DumpTable(o)
     end
 end
 
--- TODO: Use stream next time,probably won't work with big maps / complex nav mesh
+-- TODO: Stream next time,probably won't work with big maps / complex nav mesh
 local FileBuffer = {
     Position = 0,
     Buffer = 0,
