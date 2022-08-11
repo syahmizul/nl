@@ -381,10 +381,10 @@ local function AddDirectionVector(v,dir,amount)
     elseif dir == NavDirType.SOUTH then
         v.y = v.y + amount
         return
-    elseif dir == NavDirType.SOUTH then
-        v.x = v.x - amount
+    elseif dir == NavDirType.EAST then
+        v.x = v.x + amount
         return
-    elseif dir == NavDirType.SOUTH then
+    elseif dir == NavDirType.WEST then
         v.x = v.x - amount
         return
     end
@@ -1060,7 +1060,7 @@ local function FindNearestAreaToPlayer(AreaList,player)
     local Nearest_Area = nil
     for _,Area in ipairs(AreaList) do
         --Area.m_center:PrintValueClean()
-
+        
         if( #Area.m_connect == 0 )then
             goto continue
         end
@@ -1307,8 +1307,8 @@ end
 
 Menu.Text("Walkbot","The settings below are advanced and it's optional to change them.")
 
-local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 20.0, 0.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
-local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 0.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
+local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
+local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
 
 local function CheckIfArrivedAtNode(cmd)
     local local_player = EntityList.GetLocalPlayer()
@@ -1638,6 +1638,22 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
     local m_bFreezePeriod = game_rules:GetProp("m_bFreezePeriod")
     -- local m_bIsValveDS = game_rules:GetProp("m_bIsValveDS")
 
+    local player_resource = EntityList.GetPlayerResource()
+    local m_iPlayerC4 = player_resource:GetProp("m_iPlayerC4")
+
+    local entity = EntityList.GetClientEntity(EngineClient.GetLocalPlayer())
+    local player = entity:GetPlayer()
+    local active_weapon = player:GetActiveWeapon()
+
+    if (GlobalVars.tickcount % (tickrate * 0.5) == 0 and m_iPlayerC4 == player:EntIndex()) then
+        if(active_weapon:GetClassId() == 34)then
+            EngineClient.ExecuteClientCmd("drop")
+        else
+            EngineClient.ExecuteClientCmd("slot5")
+        end
+    end
+    
+
     if (GlobalVars.tickcount % tickrate == 0) then
         if (EngineClient.GetLevelNameShort() ~= LastMapName) then
             print("Map changed.")
@@ -1695,11 +1711,11 @@ local Queue = Panorama.LoadString([[
                 LobbyAPI.CreateSession();
             }
             
-            if (CompetitiveMatchAPI.HasOngoingMatch() && !GameStateAPI.IsConnectedOrConnectingToServer() )
-            {
-                CompetitiveMatchAPI.ActionReconnectToOngoingMatch();
-                return;
-            }
+            //if (CompetitiveMatchAPI.HasOngoingMatch() && !GameStateAPI.IsConnectedOrConnectingToServer() )
+            //{
+            //    CompetitiveMatchAPI.ActionReconnectToOngoingMatch();
+            //    return;
+            //}
 
             if 
             (
