@@ -64,9 +64,11 @@ function Vector3D:Zero()
     self.z = 0
 end
 
-function Vector3D:IsDifference2D(v,tolerance)
+--if the difference is higher than tolerance,THEN theres a difference
+-- limit is like a radius
+function Vector3D:IsDifference2D(v,limit)
     
-    if(math.abs(self.x - v.x) >= tolerance) or (math.abs(self.y - v.y) >= tolerance) then
+    if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) then
         -- print("IsDifference true")
         return true
     end
@@ -76,6 +78,19 @@ function Vector3D:IsDifference2D(v,tolerance)
     return false
 end
 
+-- z limit should be more loose since we have less control over the z position
+function Vector3D:IsDifference3D(v,limit,z_limit)
+    
+    if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) or (math.abs(self.z - v.z) >= (z_limit or limit)) then
+        -- print("IsDifference true")
+        return true
+    end
+    -- print(math.abs(self.x - v.x))
+    -- print(math.abs(self.y - v.y))
+    -- print(math.abs(self.z - v.z))
+    -- print("IsDifference false")
+    return false
+end
 
 function Vector3D:SetMemberFromFloatType(FloatVariable)
 	self.x = FloatVariable[0]
@@ -277,12 +292,6 @@ function Vector3D:DistToSqr(vOther)
 
     return delta:LengthSqr()
 end
-
-
-
-
-
-
 
 local Angle = {
     x,y,z
@@ -492,11 +501,54 @@ function Angle:DivideSingle(fl)
     return self
 end
 
+
+function Angle:NormalizeTo180()
+
+
+    self.x = math.modf(self.x,178)
+
+    if (self.x > 89) then
+		self.x = self.x - 178
+    elseif (self.x < -89) then
+		self.x = self.x + 178
+    end
+
+    self.y = math.modf(self.y,360)
+    if (self.y > 180) then
+		self.y = self.y - 360
+    elseif (self.y < -180) then
+		self.y = self.y + 360
+    end
+
+    self.z = 0.0
+
+end
+
+function Angle:NormalizeTo360()
+    self.x = math.modf(self.x,178)
+
+    if (self.x > 89) then
+		self.x = self.x - 178
+    elseif (self.x < -89) then
+		self.x = self.x + 178
+    end
+
+    self.y = math.modf(self.y,360)
+    if (self.y < 0) then
+		self.y = self.y + 360
+    end
+
+    self.z = 0.0
+
+
+end
+
+
 function Angle:Normalized()
 
     local res = self:Copy()
-    local l = res:Length()
-    if ( l ~= 0.0 ) then
+    local fl = res:Length()
+    if ( fl ~= 0.0 ) then
         res = res:DivideSingle(fl)
     else
         res.x = 0.00
@@ -506,11 +558,9 @@ function Angle:Normalized()
     return res
 end
 
-
-
-
-
-local Math = { }
+local Math = {
+    PI = 3.14159265358979323846
+ }
 Math.__index = Math
 
 function Math:VectorDistance(v1,v2)
@@ -666,9 +716,9 @@ function Math:VectorAngles(forward,angles)
 end
 
 function Math:Clamp(val, min, max)
-    if val < min then
+    if min > val then
         val = min
-    elseif max < val then
+    elseif val > max then
         val = max
     end
     return val
@@ -681,9 +731,9 @@ function Math:IsInBounds(PointToCheck, first_point, second_point)
     return false
 end
 
- local function GetVirtualFunction(address,index)
- local vtable = ffi.cast("uint32_t**",address)[0]
- return ffi.cast("uint32_t",vtable[index])
+local function GetVirtualFunction(address,index)
+    local vtable = ffi.cast("uint32_t**",address)[0]
+    return ffi.cast("uint32_t",vtable[index])
  end
 
 ffi.cdef[[
@@ -799,6 +849,12 @@ local function InitializeRay(Ray,VecStart,VecEnd)
     Ray.m_Start.v = ffi.new("Vector",{VecStart.x,VecStart.y,VecStart.z})
 end
 
+
+local pGetModuleHandle_sig = ffi.cast("uint32_t",Utils.PatternScan("engine.dll", " FF 15 ? ? ? ? 85 C0 74 0B"))
+local pGetModuleHandle = ffi.cast("uint32_t**", ffi.cast("uint32_t", pGetModuleHandle_sig) + 2)[0][0]
+local fnGetModuleHandle = ffi.cast("uint32_t(__stdcall*)(const char*)", pGetModuleHandle)
+
+
 local g_EngineTrace = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","EngineTraceClient004"))
 local function TraceRay(ray,mask,filter,trace)
     ffi.cast("TraceRay_FN",GetVirtualFunction(g_EngineTrace , 5)) (g_EngineTrace,ray,mask,filter,trace)
@@ -818,6 +874,29 @@ local function GetClientEntity(entNum)
     return ffi.cast("GetClientEntity_FN",GetVirtualFunction(g_EntityList , 3))(g_EntityList,entNum)
 end
 
+ffi.cdef [[
+	typedef bool (__thiscall* IsDrawingLoadingImage_FN) (uint32_t this);
+]]
+local g_EngineClient = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","VEngineClient014"))
+
+function EngineClient.IsDrawingLoadingImage()
+    return ffi.cast("IsDrawingLoadingImage_FN",GetVirtualFunction(g_EngineClient , 28))(g_EngineClient)
+end
+
+local g_GameUI = ffi.cast("uint32_t",Utils.CreateInterface("client.dll","GameUI011"))
+local g_GameState = ffi.cast("int*",g_GameUI + 0x1E4)
+
+local function GetGameState ()
+    return g_GameState[0]
+end
+
+local clientStatePtr = ffi.cast("uint32_t*",fnGetModuleHandle("engine.dll") + 5820380)[0]
+
+local function GetSignOnState()
+    local SignOnState = ffi.cast("uint32_t*",(clientStatePtr + 264))[0]
+    return SignOnState
+end
+
 local function DumpTable(o)
     if type(o) == 'table' then
         local s = '{ '
@@ -831,7 +910,7 @@ local function DumpTable(o)
     end
 end
 
--- TODO: Use stream next time,probably won't work with big maps / complex nav mesh
+-- TODO: Stream next time,probably won't work with big maps / complex nav mesh
 local FileBuffer = {
     Position = 0,
     Buffer = 0,
@@ -925,10 +1004,10 @@ local function AddDirectionVector(v,dir,amount)
     elseif dir == NavDirType.SOUTH then
         v.y = v.y + amount
         return
-    elseif dir == NavDirType.SOUTH then
-        v.x = v.x - amount
+    elseif dir == NavDirType.EAST then
+        v.x = v.x + amount
         return
-    elseif dir == NavDirType.SOUTH then
+    elseif dir == NavDirType.WEST then
         v.x = v.x - amount
         return
     end
@@ -1595,16 +1674,16 @@ function AreaNode:__eq(AnotherNode)
     return self.area.m_id == AnotherNode.area.m_id
 end
 
-local function FindNearestAreaToPlayer(AreaList)
-    local local_player = EntityList.GetLocalPlayer()
-    local lp_position = Vector3D:new()
-    lp_position:CopyOther(local_player:GetRenderOrigin())
+local function FindNearestAreaToPlayer(AreaList,player)
 
-    local Latest_Distance = 999999.0
+    local player_position = Vector3D:new()
+    player_position:CopyOther(player:GetRenderOrigin())
+
+    local Latest_Distance = math.huge
     local Nearest_Area = nil
     for _,Area in ipairs(AreaList) do
         --Area.m_center:PrintValueClean()
-
+        
         if( #Area.m_connect == 0 )then
             goto continue
         end
@@ -1613,7 +1692,7 @@ local function FindNearestAreaToPlayer(AreaList)
             goto continue  
         end
 
-        local Distance = Area.m_center:DistTo(lp_position)
+        local Distance = Area.m_center:DistToSqr(player_position)
         if(Distance <= Latest_Distance) then
             Latest_Distance = Distance
             Nearest_Area = Area
@@ -1624,7 +1703,7 @@ local function FindNearestAreaToPlayer(AreaList)
 end
 
 local function FindLowestScoreInList(List)
-    local f = 99999999999999.0
+    local f = math.huge
     local LowestScoreNode = nil
     for _,Node in ipairs(List) do
         if(Node.f < f) then
@@ -1682,6 +1761,39 @@ local ClosedList = {}
 
 --table.insert(OpenList,StartingNode)
 
+local LastFoundPlayer = nil
+local function FindNearestPlayer(FromPlayer)
+    local PlayerList = EntityList.GetPlayers()
+
+    local NearestDistance = math.huge
+    local NearestPlayer = nil
+
+    local FromPlayerRenderOrigin = FromPlayer:GetRenderOrigin()
+    local FromPlayerPos = Vector3D:new(FromPlayerRenderOrigin.x,FromPlayerRenderOrigin.y,FromPlayerRenderOrigin.z)
+
+    for _,Player in ipairs(PlayerList) do
+        if Player ~= FromPlayer and Player:IsPlayer() then
+            local BasePlayer = Player:GetPlayer()
+            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and BasePlayer:EntIndex() ~= LastFoundPlayer then
+                local PlayerOrigin = BasePlayer:GetProp("m_vecOrigin")
+                local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
+
+                local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
+                if( DistanceToFromPlayer < NearestDistance) then
+                    NearestDistance = DistanceToFromPlayer
+                    NearestPlayer = BasePlayer
+                end
+            end
+            
+        end
+    end
+
+    if(NearestPlayer ~= nil)then
+        LastFoundPlayer = NearestPlayer:EntIndex()
+    end
+    return NearestPlayer
+end
+
 
 
 local StartingNode = nil
@@ -1689,22 +1801,43 @@ local EndArea = nil
 local CurrentNode = nil
 local Path = {}
 
+local NodeToSkip = {}
+local PlayersToSkip = {}
 local function PrepareToFindAnotherNode()
+
+    math.randomseed(GlobalVars.tickcount)
 
     OpenList = { }
     ClosedList = { }
     CurrentNode = nil
     Path = { }
 
+    local local_player = EntityList.GetLocalPlayer()
+
     StartingNode = AreaNode:new()
-    StartingNode.area = FindNearestAreaToPlayer(INavFile.m_areas)
+    StartingNode.area = FindNearestAreaToPlayer(INavFile.m_areas,local_player)
 
-    EndArea = INavFile:GetNavAreaByID(math.random(1,#INavFile.m_areas))
 
-    while (EndArea == nil or #EndArea.m_connect < 1 or (bit.band(EndArea.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0)) do
+    local ChosenPlayer = FindNearestPlayer(local_player)
+
+
+    
+    if (ChosenPlayer ~= nil) then
+        print("Targetting player : " , ChosenPlayer:GetName())
+        EndArea = FindNearestAreaToPlayer(INavFile.m_areas,ChosenPlayer)
+    else
         EndArea = INavFile:GetNavAreaByID(math.random(1,#INavFile.m_areas))
+
+        while (EndArea == nil or #EndArea.m_connect < 1 or (bit.band(EndArea.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0)) do
+            EndArea = INavFile:GetNavAreaByID(math.random(1,#INavFile.m_areas))
+            -- print(math.random(1,#INavFile.m_areas))
+        end
     end
 
+    -- print(#INavFile.m_areas)
+    -- print(StartingNode.area.m_id)
+    -- print(EndArea.m_id)
+    -- EndArea.m_center:PrintValueClean()
     StartingNode.parent = StartingNode
     StartingNode.g = StartingNode.area.m_center:DistToManhattanVer(StartingNode.area.m_center)
     StartingNode.h = StartingNode.area.m_center:DistToManhattanVer(EndArea.m_center)
@@ -1715,7 +1848,8 @@ local function PrepareToFindAnotherNode()
     --print(#OpenList)
     table.insert(OpenList,StartingNode)
     --end
-
+    NodeToSkip = {}
+    PlayersToSkip = {}
 end
 
 local NeedToResetLists = true
@@ -1794,7 +1928,10 @@ local function FindPath()
 
 end
 
+Menu.Text("Walkbot","The settings below are advanced and it's optional to change them.")
 
+local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
+local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
 
 local function CheckIfArrivedAtNode(cmd)
     local local_player = EntityList.GetLocalPlayer()
@@ -1802,7 +1939,7 @@ local function CheckIfArrivedAtNode(cmd)
 
     local NodeToMoveTo = Path[#Path]
     if(NodeToMoveTo ~= nil)then
-        if(NodeToMoveTo.area.m_center:DistTo2D(local_player_pos) <= 20.0)then
+        if(not NodeToMoveTo.area.m_center:IsDifference3D(local_player_pos,Difference2DLimit:Get(),Z_Limit:Get())) then
             --print("arrived at path")
             table.remove(Path,#Path)
             if(#Path == 0) then
@@ -1812,64 +1949,147 @@ local function CheckIfArrivedAtNode(cmd)
     end
 end
 
+local function FixMovement(EngineAngle,cmd,fOldForward,fOldSidemove)
+    local deltaView
+    local f1
+    local f2
+
+    if(EngineAngle.yaw < 0.0)then
+        f1 = 360.0 + EngineAngle.yaw
+    else
+        f1 = EngineAngle.yaw
+    end
+
+    if (cmd.viewangles.yaw < 0.0)then
+        f2 = 360.0 + cmd.viewangles.yaw
+    else
+        f2 = cmd.viewangles.yaw
+    end
+
+    if (f2 < f1)then
+        deltaView = math.abs(f2 - f1)
+    else
+        deltaView = 360.0 - math.abs(f1 - f2)
+    end
+
+    deltaView = 360.0 - deltaView
+
+    cmd.forwardmove = ( math.cos(math.rad(deltaView)) * fOldForward ) + ( math.cos(math.rad(deltaView + 90)) * fOldSidemove )
+    cmd.sidemove = ( math.sin(math.rad(deltaView)) * fOldForward ) + ( math.sin(math.rad(deltaView + 90)) * fOldSidemove )
+end
+
+
+local jumped_last_tick = false
+local should_fake_jump = false
+local function Bhop(cmd)
+
+    cmd.buttons = bit.bor(cmd.buttons,2)
+    return
+
+    -- local local_player = EntityList.GetLocalPlayer()
+    -- local m_nMoveType = ffi.cast("int*",GetClientEntity(local_player:EntIndex()) + 0x25C)[0] 
+    -- local m_fFlags = local_player:GetProp("m_fFlags")
+    -- print(m_fFlags)
+    -- if(m_nMoveType == 9 or m_nMoveType == 8) then
+    --     return
+    -- end
+
+    -- if(bit.band(m_fFlags,1024) == 1024) then
+    --     return
+    -- end   
+
+    -- if(not jumped_last_tick and should_fake_jump) then
+    --     print("Jump")
+    --     should_fake_jump = false;
+    --     cmd.buttons = bit.bor(cmd.buttons,2)
+    -- elseif(bit.band(cmd.buttons,2) == 2 ) then
+
+    --     if(bit.band(m_fFlags,1) == 1 ) then
+    --         jumped_last_tick = true
+    --         should_fake_jump = true
+    --     else
+    --         cmd.buttons = bit.band(cmd.buttons,bit.bnot(2))
+    --         jumped_last_tick = false
+    --     end
+
+    -- else
+    --     jumped_last_tick = false
+    --     should_fake_jump = false
+    -- end
+end
+
 local MovingTicks = 1
 local NotMovingTicks = 1
 
-local ThresholdTime = 5 -- time to switch between avoidance methods
-local ThresholdTimeReset = 2 -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
+-- TODO : Use curtime / realtime instead of tickcount and get a better name for these namings and better descriptions
+-- TODO : Use better methods of keeping track of time instead of using these modulo operations
+local ThresholdTime = Menu.SliderInt("Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
+local ThresholdTimeReset = Menu.SliderInt("Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
 
-local CycleAttempt = 0 -- 5 methods
-local LastLocation = nil
+local CycleAttempt = 1 
+local CycleMethods = 8
+-- local LastLocation = nil
 local function ObstacleAvoid(cmd)
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
 
     local local_player = EntityList.GetLocalPlayer()
     local local_player_pos = Vector3D:new()
+    local local_player_weapon = local_player:GetActiveWeapon()
     local_player_pos:CopyOther(local_player:GetRenderOrigin())
+    
+    local max_speed = 230.0
+    if local_player_weapon then
+        max_speed = local_player_weapon:GetMaxSpeed()
+    end
+    local local_player_speed = Vector3D:new(local_player:GetProp("m_vecVelocity[0]"),local_player:GetProp("m_vecVelocity[1]"),local_player:GetProp("m_vecVelocity[2]")):Length2D()
 
-    if(LastLocation ~= nil) then
-        --print(LastLocation:DistTo2D(local_player_pos))
-        if(not LastLocation:IsDifference2D(local_player_pos,1.0)) then
-            NotMovingTicks = (NotMovingTicks + 1) % 6400
-            MovingTicks = 1
-        else
-            MovingTicks = (MovingTicks + 1) % 6400
-            if(MovingTicks % 64 * ThresholdTimeReset == 0) then
-                CycleAttempt = 0
-            end
-            NotMovingTicks = 1
+    -- if(LastLocation ~= nil) then
+    --     --print(LastLocation:DistTo2D(local_player_pos))
+    --     -- if(not LastLocation:IsDifference2D(local_player_pos,3.0)) then
+        
+    --     LastLocation = local_player_pos
+    -- else
+    --     LastLocation = local_player_pos
+    -- end
+
+    -- print(local_player_speed >= 0.34 * max_speed)
+    if(local_player_speed >= 0.10 * max_speed) then
+        MovingTicks = (MovingTicks + 1) % 6400
+        if(MovingTicks % tickrate * ThresholdTimeReset:Get() == 0) then
+            CycleAttempt = 0
         end
-        LastLocation = local_player_pos
+        NotMovingTicks = 1
     else
-        LastLocation = local_player_pos
+        NotMovingTicks = (NotMovingTicks + 1) % 6400
+        MovingTicks = 1
     end
 
-    if (NotMovingTicks % (64 * ThresholdTime) == 0) then
-        CycleAttempt = (CycleAttempt + 1) % 8
+    if (GlobalVars.tickcount % (tickrate * ThresholdTime:Get()) == 0) then
+        CycleAttempt = CycleAttempt % CycleMethods + 1
     end
 
-    --print(CycleAttempt)
+    -- print(CycleAttempt)
     -- print("MovingTicks : " .. MovingTicks)
     -- print("NotMovingTicks : " .. NotMovingTicks)
     local NodeToMoveTo = Path[#Path]
-    -- print(CycleAttempt)
-    -- print(NotMovingTicks)
     if(NotMovingTicks > 1) then
         --TODO : make a table and just loop through them by indexing using CycleAttempt
-        if( CycleAttempt == 0 )then -- Check attribute flags of areas
+        if( CycleAttempt == 1 )then -- Check attribute flags of areas
             if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then
-                cmd.buttons = bit.bor(cmd.buttons,2) -- Jump
+                Bhop(cmd) -- Jump
             end
 
             if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_CROUCH) ~= 0) then
                 cmd.buttons = bit.bor(cmd.buttons,4) -- Crouch
             end
-        elseif ( CycleAttempt == 1 ) then -- Jump and crouch
-            cmd.buttons = bit.bor(cmd.buttons,2,4)
-        elseif ( CycleAttempt == 2 ) then -- Just jump
-            cmd.buttons = bit.bor(cmd.buttons,2)
-        elseif ( CycleAttempt == 3 ) then -- Just crouch
+        elseif ( CycleAttempt == 2 ) then -- Jump and crouch
+            Bhop(cmd)
             cmd.buttons = bit.bor(cmd.buttons,4)
-        elseif ( CycleAttempt == 4 ) then -- IN_USE what's in front of us
+        elseif ( CycleAttempt == 3 ) then -- Just jump
+            Bhop(cmd)
+        elseif ( CycleAttempt == 4 ) then -- Just crouch
+            cmd.buttons = bit.bor(cmd.buttons,4)
+        elseif ( CycleAttempt == 5 ) then -- IN_USE what's in front of us
             local LocalEyePos = local_player:GetEyePosition()
             local LocalEyePosCustom = Vector3D:new()
             LocalEyePosCustom:CopyOther(LocalEyePos)
@@ -1882,10 +2102,17 @@ local function ObstacleAvoid(cmd)
             local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
             local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,TracedEndPosCustom)
 
+            cmd.forwardmove = 0.0
+            cmd.sidemove = 0.0
             cmd.viewangles.pitch = AngleToVectorUse.x
             cmd.viewangles.yaw = AngleToVectorUse.y
+            AntiAim.OverridePitch(AngleToVectorUse.x)
+            AntiAim.OverrideYawOffset(AngleToVectorUse.y)
             cmd.buttons = bit.bor(cmd.buttons,32)
-        elseif ( CycleAttempt == 5) then -- Shoot what's in front of us    
+
+            
+            
+        elseif ( CycleAttempt == 6) then -- Shoot what's in front of us    
             local LocalEyePos = local_player:GetEyePosition()
             local LocalEyePosCustom = Vector3D:new()
             LocalEyePosCustom:CopyOther(LocalEyePos)
@@ -1898,26 +2125,42 @@ local function ObstacleAvoid(cmd)
             local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
             local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,TracedEndPosCustom)
 
+            cmd.forwardmove = 0.0
+            cmd.sidemove = 0.0
             cmd.viewangles.pitch = AngleToVectorUse.x
             cmd.viewangles.yaw = AngleToVectorUse.y
+
+
+            AntiAim.OverridePitch(AngleToVectorUse.x)
+            AntiAim.OverrideYawOffset(AngleToVectorUse.y)
+
+            if(traced.hit_entity and traced.hit_entity:IsPlayer()) then
+                if(traced.hit_entity:GetPlayer():IsTeamMate()) then
+                    return
+                end
+            end
+
             cmd.buttons = bit.bor(cmd.buttons,1)
-        elseif ( CycleAttempt == 6) then
+
+        elseif ( CycleAttempt == 7) then
             -- do nothing
-        elseif ( CycleAttempt == 7) then -- Find another end area and new starting node
+        elseif ( CycleAttempt == 8) then -- Find another end area and new starting node
             Path = {}
-            CycleAttempt = 0 -- when path is found and CycleAttempt is still 6,it will attempt to find another end area,causing an infinite loop of finding paths and generating new end area.
+            CycleAttempt = 0 -- when path is found and CycleAttempt is still 8,it will attempt to find another end area,causing an infinite loop of finding paths and generating new end area.
             NeedToResetLists = true
         end
     else
-        if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then
-            cmd.buttons = bit.bor(cmd.buttons,2) -- Jump
+        if( bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then
+            Bhop(cmd) -- Jump
         end
 
-        if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_CROUCH) ~= 0) then
+        if( bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_CROUCH) ~= 0) then
             cmd.buttons = bit.bor(cmd.buttons,4) -- Crouch
         end
     end
 end
+
+
 
 local function MoveToTarget(cmd)
 
@@ -1925,24 +2168,29 @@ local function MoveToTarget(cmd)
     local local_player_pos = local_player:GetRenderOrigin()
 
     local view_angles = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
-
+    -- local cmd_view_angles = Angle:MakeNewAngleFromNLAngle(cmd.viewangles)
     local NodeToMoveTo = Path[#Path]
 
     local AngleToNode = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
-    AngleToNode = view_angles - AngleToNode
+
+    view_angles.x = 0.0
+    AngleToNode.x = 0.0
+    view_angles.z = 0.0
+    AngleToNode.z = 0.0
+    AngleToNode = (view_angles - AngleToNode) -- AngleToNode - view_angles if the game's angles is clock wise
+
+
 
     local forward = Vector3D:new()
-    local right = Vector3D:new()
-    local up = Vector3D:new()
 
-    Math:AngleVectorsExtra(AngleToNode,forward,right,up)
 
-    --print("Forward : ")
+    Math:AngleVectors(AngleToNode,forward)
+
     forward = forward:MultiplySingle(450)
-    --forward:PrintValueClean()
+
+
     cmd.forwardmove = forward.x
     cmd.sidemove = forward.y
-    cmd.upmove = 0.0
 
 end
 
@@ -2003,49 +2251,121 @@ end
 
 --local iteration = 0
 local LastMapName = nil
+-- local ShouldStop = false
 
 Cheat.RegisterCallback("pre_prediction", function(cmd)
-
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
    --FindPath()
+    local game_rules = EntityList.GetGameRules()
+    local m_bWarmupPeriod = game_rules:GetProp("m_bWarmupPeriod")
+    local m_bFreezePeriod = game_rules:GetProp("m_bFreezePeriod")
+    -- local m_bIsValveDS = game_rules:GetProp("m_bIsValveDS")
 
-   if (EngineClient.GetLevelNameShort() ~= LastMapName and GlobalVars.tickcount % 64 == 0)then
-        print("Map changed.")
-        INavFile.m_isLoaded = false
-        OpenList = { }
-        ClosedList = { }
-        CurrentNode = nil
-        Path = { }
-        NeedToResetLists = true
-   end
+    local player_resource = EntityList.GetPlayerResource()
+    local m_iPlayerC4 = player_resource:GetProp("m_iPlayerC4")
 
-   if (not INavFile.m_isLoaded) then
-       print("LoadMap : " .. EngineClient.GetLevelNameShort())
-       LoadMap(EngineClient.GetLevelNameShort())
-       LastMapName = EngineClient.GetLevelNameShort()
-       return
-   end
+    local entity = EntityList.GetClientEntity(EngineClient.GetLocalPlayer())
+    local player = entity:GetPlayer()
+    local active_weapon = player:GetActiveWeapon()
 
-   if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded then
-       --print("Iteration : ",iteration)
-       if(#Path == 0) then
-           if(NeedToResetLists)then
-               --print("PATH 0")
-               PrepareToFindAnotherNode()
-               NeedToResetLists = false
-           else
-               FindPath()
-           end
-       else
-           --print("ELSE PATH 0")
-           MoveToTarget(cmd)
-           ObstacleAvoid(cmd)
-           CheckIfArrivedAtNode(cmd)
+    if (GlobalVars.tickcount % (tickrate * 0.5) == 0 and m_iPlayerC4 == player:EntIndex()) then
+        if(active_weapon:GetClassId() == 34)then
+            EngineClient.ExecuteClientCmd("drop")
+        else
+            EngineClient.ExecuteClientCmd("slot5")
+        end
+    end
+    
 
-       end
-   end
+    if (GlobalVars.tickcount % tickrate == 0) then
+        if (EngineClient.GetLevelNameShort() ~= LastMapName) then
+            print("Map changed.")
+            INavFile.m_isLoaded = false
+            OpenList = { }
+            ClosedList = { }
+            CurrentNode = nil
+            Path = { }
+            NeedToResetLists = true
+        end
+    end
+
+    if (not INavFile.m_isLoaded) then
+        print("LoadMap : " .. EngineClient.GetLevelNameShort())
+        LoadMap(EngineClient.GetLevelNameShort())
+        LastMapName = EngineClient.GetLevelNameShort()
+        return
+    end
+
+    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded --[[ and not ShouldStop ]] and not((GlobalVars.m_bRemoteClient and m_bWarmupPeriod) or m_bFreezePeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
+        --print("Iteration : ",iteration)
+        if(#Path == 0) then
+            if(NeedToResetLists)then
+                --print("PATH 0")
+                PrepareToFindAnotherNode()
+                NeedToResetLists = false
+            else
+                FindPath()
+                cmd.forwardmove = 0.0
+                cmd.sidemove = 0.0
+                cmd.upmove = 0.0
+            end
+        else
+            --print("ELSE PATH 0")
+            MoveToTarget(cmd)
+            ObstacleAvoid(cmd)
+            CheckIfArrivedAtNode(cmd)
+
+        end
+    end
+    FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
+    cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
+    cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
+
+    cmd.viewangles.pitch = Math:Clamp(cmd.viewangles.pitch ,-89,89)
+    cmd.viewangles.yaw = Math:Clamp(cmd.viewangles.yaw ,-180,180)
+    cmd.viewangles.roll = 0.0
 end)
+local AutoQueue_Switch = Menu.Switch("Misc", "Auto queue", true, "Automatically queues for you.")
+local Queue = Panorama.LoadString([[
+    function queueMatchmaking() 
+        {
+            if (!LobbyAPI.BIsHost()) 
+            {
+                LobbyAPI.CreateSession();
+            }
+            
+            //if (CompetitiveMatchAPI.HasOngoingMatch() && !GameStateAPI.IsConnectedOrConnectingToServer() )
+            //{
+            //    CompetitiveMatchAPI.ActionReconnectToOngoingMatch();
+            //    return;
+            //}
+
+            if 
+            (
+                !( 
+                    GameStateAPI.IsConnectedOrConnectingToServer() || 
+                    LobbyAPI.GetMatchmakingStatusString() || 
+                    CompetitiveMatchAPI.GetCooldownSecondsRemaining() > 0 || 
+                    CompetitiveMatchAPI.HasOngoingMatch() 
+                ) 
+            ) 
+            {
+                LobbyAPI.StartMatchmaking("", "", "", "");
+            }
+            
+        }
+    
+        queueMatchmaking();	
+]])
 
 Cheat.RegisterCallback("draw", function()
+
+    -- print(GetGameState())
+    -- print(GetSignOnState())
+    -- print(EngineClient.IsDrawingLoadingImage())
+    if(AutoQueue_Switch:Get() and (math.ceil(GlobalVars.curtime) % 10 == 0 ) and not EngineClient.IsDrawingLoadingImage() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
+        Queue()
+    end
 
     --print(#Path)
     if #Path == 0 then
@@ -2113,9 +2433,31 @@ Cheat.RegisterCallback("draw", function()
         --end
     end
 end)
+
+
 Cheat.RegisterCallback("events", function(event)
 
     -- print(event:GetName())
+
+    -- if (event:GetName() == "round_prestart") then
+    --     ShouldStop = true
+    --     goto continue
+	-- end
+ 
+    -- if (event:GetName() == "round_end") then
+    --     IsWarmup = false
+    --     goto continue
+    -- end
+
+	-- if (event:GetName() == "round_freeze_end") then
+	-- 	ShouldStop = false
+    --     goto continue
+    -- end
+ 
+	-- if (event:GetName() == "round_end") then
+	-- 	ShouldStop = true
+    --     goto continue
+    -- end
 
     if(event:GetName() == "cs_game_disconnected") then
         print("cs_game_disconnected")
@@ -2125,7 +2467,9 @@ Cheat.RegisterCallback("events", function(event)
         CurrentNode = nil
         Path = { }
         NeedToResetLists = true
-    elseif (event:GetName() == "player_spawn") then
+        goto continue
+    end
+    if (event:GetName() == "player_spawn") then
         local local_player = EntityList.GetLocalPlayer()
         if local_player == nil then
             return
@@ -2147,16 +2491,7 @@ Cheat.RegisterCallback("events", function(event)
     --     CurrentNode = nil
     --     Path = { }
     --     NeedToResetLists = true
+        goto continue
     end
-
+    ::continue::
 end)
--- Slow/Lazy Area loading,need to make sure header infos are seeked into the position first.
---local iteration = 0
---Cheat.RegisterCallback("draw", function()
---    if iteration < INavFile.m_uiAreaCount and math.floor(GlobalVars.realtime % 2) == 0 then
---        print("Iteration : ",iteration)
---        local area = CNavArea:new()
---        area:LoadFromFile(CustomBuffer)
---        iteration = iteration + 1
---    end
---end)

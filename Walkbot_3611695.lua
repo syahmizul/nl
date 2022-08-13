@@ -252,12 +252,27 @@ local function GetClientEntity(entNum)
 end
 
 ffi.cdef [[
-	typedef bool (__thiscall* IsDrawingLoadingImage_FN) (uint32_t this);
+	typedef bool        (__thiscall* IsDrawingLoadingImage_FN)          (uint32_t this);
+    typedef bool        (__thiscall* IsTransitioningToLoad_FN)          (uint32_t this);
+    typedef bool        (__thiscall* IsClientLocalToActiveServer_FN)    (uint32_t this);
+    typedef char const* (__thiscall* GetLevelNameShort_FN)              (uint32_t this);
 ]]
 local g_EngineClient = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","VEngineClient014"))
 
-function EngineClient.IsDrawingLoadingImage()
+local function IsDrawingLoadingImage()
     return ffi.cast("IsDrawingLoadingImage_FN",GetVirtualFunction(g_EngineClient , 28))(g_EngineClient)
+end
+
+local function IsTransitioningToLoad()
+    return ffi.cast("IsTransitioningToLoad_FN",GetVirtualFunction(g_EngineClient , 182))(g_EngineClient)
+end
+
+local function GetLevelNameShort()
+    return ffi.cast("GetLevelNameShort_FN",GetVirtualFunction(g_EngineClient , 53))(g_EngineClient)
+end
+
+local function IsClientLocalToActiveServer()
+    return ffi.cast("IsClientLocalToActiveServer_FN",GetVirtualFunction(g_EngineClient , 197))(g_EngineClient)
 end
 
 local g_GameUI = ffi.cast("uint32_t",Utils.CreateInterface("client.dll","GameUI011"))
@@ -273,6 +288,10 @@ local function GetSignOnState()
     local SignOnState = ffi.cast("uint32_t*",(clientStatePtr + 264))[0]
     return SignOnState
 end
+
+local g_EngineVGUI = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","VEngineVGui001"))
+
+local scr_disabled_for_loading = ffi.cast("bool*",fnGetModuleHandle("engine.dll") + 0x62A115)
 
 local function DumpTable(o)
     if type(o) == 'table' then
@@ -1703,47 +1722,87 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
     cmd.viewangles.roll = 0.0
 end)
 local AutoQueue_Switch = Menu.Switch("Misc", "Auto queue", true, "Automatically queues for you.")
-local Queue = Panorama.LoadString([[
-    function queueMatchmaking() 
-        {
-            if (!LobbyAPI.BIsHost()) 
-            {
-                LobbyAPI.CreateSession();
-            }
+local panorama = Panorama.Open()
+-- local Queue = Panorama.LoadString([[
+--     function queueMatchmaking() 
+--         {
+--             if (!LobbyAPI.BIsHost()) 
+--             {
+--                 LobbyAPI.CreateSession();
+--             }
             
-            //if (CompetitiveMatchAPI.HasOngoingMatch() && !GameStateAPI.IsConnectedOrConnectingToServer() )
-            //{
-            //    CompetitiveMatchAPI.ActionReconnectToOngoingMatch();
-            //    return;
-            //}
+--             if (CompetitiveMatchAPI.HasOngoingMatch() && !GameStateAPI.IsConnectedOrConnectingToServer() )
+--             {
+--                CompetitiveMatchAPI.ActionReconnectToOngoingMatch();
+--                return;
+--             }
 
-            if 
+--             if 
+--             (
+--                 !( 
+--                     GameStateAPI.IsConnectedOrConnectingToServer() || 
+--                     LobbyAPI.GetMatchmakingStatusString() || 
+--                     CompetitiveMatchAPI.GetCooldownSecondsRemaining() > 0 || 
+--                     CompetitiveMatchAPI.HasOngoingMatch() 
+--                 ) 
+--             ) 
+--             {
+--                 LobbyAPI.StartMatchmaking("", "", "", "");
+--             }
+            
+--         }
+    
+--         queueMatchmaking();	
+-- ]])
+
+local function AutoQueue ()
+    if(AutoQueue_Switch:Get() and not IsDrawingLoadingImage() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
+        if ( not panorama.LobbyAPI.BIsHost()) then
+            panorama.LobbyAPI.CreateSession()
+        end
+        
+        if 
             (
-                !( 
-                    GameStateAPI.IsConnectedOrConnectingToServer() || 
-                    LobbyAPI.GetMatchmakingStatusString() || 
-                    CompetitiveMatchAPI.GetCooldownSecondsRemaining() > 0 || 
-                    CompetitiveMatchAPI.HasOngoingMatch() 
+                
+                ( 
+                    not panorama.GameStateAPI.IsConnectedOrConnectingToServer() and
+                    panorama.LobbyAPI.GetMatchmakingStatusString() == "" and
+                    panorama.CompetitiveMatchAPI.GetCooldownSecondsRemaining() == 0 and
+                    not panorama.CompetitiveMatchAPI.HasOngoingMatch() 
                 ) 
             ) 
-            {
-                LobbyAPI.StartMatchmaking("", "", "", "");
-            }
-            
-        }
-    
-        queueMatchmaking();	
-]])
+        then
+            panorama.LobbyAPI.StartMatchmaking("", "", "", "");
+        end
+    end
+end
+
+local AlreadyAttemptedToReconnect = false
+local function AutoReconnect()
+    if not AlreadyAttemptedToReconnect then
+        if (panorama.CompetitiveMatchAPI.HasOngoingMatch() and not panorama.GameStateAPI.IsConnectedOrConnectingToServer() ) then
+            panorama.CompetitiveMatchAPI.ActionReconnectToOngoingMatch()
+            AlreadyAttemptedToReconnect = true
+        end
+    end
+end
 
 Cheat.RegisterCallback("draw", function()
 
     -- print(GetGameState())
-    -- print(GetSignOnState())
-    -- print(EngineClient.IsDrawingLoadingImage())
-    if(AutoQueue_Switch:Get() and (math.ceil(GlobalVars.curtime) % 10 == 0 ) and not EngineClient.IsDrawingLoadingImage() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
-        Queue()
-    end
-
+    -- print(IsDrawingLoadingImage())
+    -- print(IsDrawingLoadingImage())
+    -- local m_bShowProgressDialog = ffi.cast("bool*",g_EngineVGUI + 0x58)[0]
+    -- print(m_bShowProgressDialog)
+    -- print(IsTransitioningToLoad())  
+    -- if scr_disabled_for_loading[0] == true then 
+    --     print("scr_disabled_for_loading :::::::::::::::: " , scr_disabled_for_loading[0])
+    -- end
+    
+    -- print(IsClientLocalToActiveServer())
+    AutoReconnect()
+    AutoQueue()
+    
     --print(#Path)
     if #Path == 0 then
         --if(CurrentNode ~= nil)then
@@ -1837,7 +1896,10 @@ Cheat.RegisterCallback("events", function(event)
     -- end
 
     if(event:GetName() == "cs_game_disconnected") then
-        print("cs_game_disconnected")
+        -- print("cs_game_disconnected")
+
+        AlreadyAttemptedToReconnect = false
+
         INavFile.m_isLoaded = false
         OpenList = { }
         ClosedList = { }
