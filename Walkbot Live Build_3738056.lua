@@ -2698,9 +2698,10 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
         else
             --print("ELSE PATH 0")
             
-            
             MoveToTarget(cmd)
-            ObstacleAvoid(cmd)
+            if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
+                ObstacleAvoid(cmd)
+            end
             CheckIfArrivedAtNode(cmd)
         end
         if not (bit.band(cmd.buttons,1) ~= 0)then 
