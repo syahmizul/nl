@@ -293,4 +293,12 @@ function Vector3D:DistToSqr(vOther)
     return delta:LengthSqr()
 end
 
+-- Global/Static/Helper functions
+function Vector3D:IsValid(vector)
+    if vector.x ~= vector.x or vector.y ~= vector.y or vector.z ~= vector.z then
+        return false
+    end
+
+    return true
+end
 return Vector3D

@@ -17,11 +17,17 @@ function Math:CalcAngle(src,dst)
     local delta = Vector3D:new()
     delta:SetMembers(src.x - dst.x ,src.y - dst.y,src.z - dst.z)
 
+    if not Vector3D:IsValid(delta) then return nil end
+
     local hyp = math.sqrt(delta.x * delta.x + delta.y * delta.y)
 
-    vAngle.x = math.atan(delta.z / hyp) * 57.295779513082
-    vAngle.y = math.atan(delta.y / delta.x) * 57.295779513082
+    if hyp ~= hyp then return nil end
+
+    vAngle.x = math.atan(delta.z/hyp) * 57.295779513082
+    vAngle.y = math.atan(delta.y/delta.x) * 57.295779513082
     vAngle.z = 0.0
+
+    if not Angle:IsValid(vAngle) then return nil end
 
     if (delta.x >= 0.0) then
         vAngle.y = vAngle.y + 180.0
@@ -50,14 +56,12 @@ function Math:ClampAngles(angles)
     elseif (angles.x < -89.0) then
         angles.x = -89.0
     end
+    
 
-
-    while(angles.y > 180.0) do
-        angles.y = angles.y - 180.0
-    end
-
-    while(angles.y < -180.0) do
-        angles.y = angles.y + 180.0
+    if (angles.y > 180.0) then
+        angles.y = 180.0
+    elseif (angles.y < -180.0) then
+        angles.y = -180.0
     end
 
     angles.z = 0
@@ -158,12 +162,7 @@ function Math:VectorAngles(forward,angles)
 end
 
 function Math:Clamp(val, min, max)
-    if min > val then
-        val = min
-    elseif val > max then
-        val = max
-    end
-    return val
+    return math.max(min,math.min(val,max))
 end
 
 function Math:IsInBounds(PointToCheck, first_point, second_point)
@@ -171,6 +170,32 @@ function Math:IsInBounds(PointToCheck, first_point, second_point)
         return true
     end
     return false
+end
+
+function Math:SmoothAngle( from , to , percent )
+
+    percent = percent or 25
+
+    from:NormalizeTo180()
+    to:NormalizeTo180()
+	local VecDelta = from - to
+
+
+    VecDelta:NormalizeTo180()
+    
+	VecDelta.x = VecDelta.x * ( percent / 100.0 )
+	VecDelta.y = VecDelta.y * ( percent / 100.0 )
+
+
+    VecDelta:NormalizeTo180()
+
+
+
+    local DeltaLast = (from - VecDelta)
+    DeltaLast:NormalizeTo180()
+
+
+	return DeltaLast 
 end
 
 return Math

@@ -23,9 +23,17 @@ end
 
 function Angle:MakeNewAngleFromNLAngle(NeverLoseAngle)
     local NewAngle = Angle:new()
-    NewAngle.x = NeverLoseAngle.pitch
-    NewAngle.y = NeverLoseAngle.yaw
-    NewAngle.z = NeverLoseAngle.roll
+    NewAngle.x = NeverLoseAngle.pitch or 0.00
+    NewAngle.y = NeverLoseAngle.yaw or 0.00
+    NewAngle.z = NeverLoseAngle.roll or 0.00
+    return NewAngle
+end
+
+function Angle:MakeNewAngleFromNLVector(NeverLoseVector)
+    local NewAngle = Angle:new()
+    NewAngle.x = NeverLoseVector.x or 0.00
+    NewAngle.y = NeverLoseVector.y or 0.00
+    NewAngle.z = NeverLoseVector.z or 0.00
     return NewAngle
 end
 
@@ -210,15 +218,15 @@ end
 function Angle:NormalizeTo180()
 
 
-    self.x = math.modf(self.x,178)
+    self.x = math.fmod(self.x,178)
 
     if (self.x > 89) then
-		self.x = self.x - 178
+		self.x = 89
     elseif (self.x < -89) then
-		self.x = self.x + 178
+		self.x = -89
     end
 
-    self.y = math.modf(self.y,360)
+    self.y = math.fmod(self.y,360)
     if (self.y > 180) then
 		self.y = self.y - 360
     elseif (self.y < -180) then
@@ -230,15 +238,16 @@ function Angle:NormalizeTo180()
 end
 
 function Angle:NormalizeTo360()
-    self.x = math.modf(self.x,178)
+    self.x = math.fmod(self.x,178)
 
     if (self.x > 89) then
-		self.x = self.x - 178
+		self.x = 89
     elseif (self.x < -89) then
-		self.x = self.x + 178
+		self.x = -89
     end
 
-    self.y = math.modf(self.y,360)
+    self.y = math.fmod(self.y,360)
+    
     if (self.y < 0) then
 		self.y = self.y + 360
     end
@@ -261,6 +270,15 @@ function Angle:Normalized()
         res.z = 0.00
     end
     return res
+end
+
+-- Global/Static/Helper functions
+function Angle:IsValid(angle)
+    if angle.x ~= angle.x or angle.y ~= angle.y or angle.z ~= angle.z then
+        return false
+    end
+
+    return true
 end
 
 --function Angle:DistTo(vOther)
