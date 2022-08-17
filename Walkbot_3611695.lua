@@ -1722,15 +1722,15 @@ local function MoveToTarget(cmd)
 
     Math:AngleVectors(AngleToNode,forward)
     -- print(TimeSinceLastSeenEnemy)
-    if TimeSinceLastSeenEnemy <= tickrate * TimeToMove:Get() then
+    if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
+        forward = forward:MultiplySingle(450)
+    else
         if local_weapon and not local_weapon:IsReloading() then
             -- print("Stopping to max weapon speed")
             local weapon_max_speed = local_weapon:GetMaxSpeed()
             local weapon_speed_max_accuracy = weapon_max_speed * 0.25
             forward = forward:MultiplySingle(weapon_speed_max_accuracy)
         end
-    else
-        forward = forward:MultiplySingle(450)
     end
     
 
@@ -1831,7 +1831,10 @@ local LatestAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
 
 
 local function Aimbot(cmd)
-    if not Aimbot_Enable:Get() then return end
+    if not Aimbot_Enable:Get() then 
+        TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
+        return 
+    end
     local tickrate = 1.0 / GlobalVars.interval_per_tick
 
     TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
