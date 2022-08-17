@@ -293,6 +293,15 @@ function Vector3D:DistToSqr(vOther)
     return delta:LengthSqr()
 end
 
+-- Global/Static/Helper functions
+function Vector3D:IsValid(vector)
+    if vector.x ~= vector.x or vector.y ~= vector.y or vector.z ~= vector.z then
+        return false
+    end
+
+    return true
+end
+
 local Angle = {
     x,y,z
 }
@@ -318,9 +327,17 @@ end
 
 function Angle:MakeNewAngleFromNLAngle(NeverLoseAngle)
     local NewAngle = Angle:new()
-    NewAngle.x = NeverLoseAngle.pitch
-    NewAngle.y = NeverLoseAngle.yaw
-    NewAngle.z = NeverLoseAngle.roll
+    NewAngle.x = NeverLoseAngle.pitch or 0.00
+    NewAngle.y = NeverLoseAngle.yaw or 0.00
+    NewAngle.z = NeverLoseAngle.roll or 0.00
+    return NewAngle
+end
+
+function Angle:MakeNewAngleFromNLVector(NeverLoseVector)
+    local NewAngle = Angle:new()
+    NewAngle.x = NeverLoseVector.x or 0.00
+    NewAngle.y = NeverLoseVector.y or 0.00
+    NewAngle.z = NeverLoseVector.z or 0.00
     return NewAngle
 end
 
@@ -505,15 +522,15 @@ end
 function Angle:NormalizeTo180()
 
 
-    self.x = math.modf(self.x,178)
+    self.x = math.fmod(self.x,178)
 
     if (self.x > 89) then
-		self.x = self.x - 178
+		self.x = 89
     elseif (self.x < -89) then
-		self.x = self.x + 178
+		self.x = -89
     end
 
-    self.y = math.modf(self.y,360)
+    self.y = math.fmod(self.y,360)
     if (self.y > 180) then
 		self.y = self.y - 360
     elseif (self.y < -180) then
@@ -525,15 +542,16 @@ function Angle:NormalizeTo180()
 end
 
 function Angle:NormalizeTo360()
-    self.x = math.modf(self.x,178)
+    self.x = math.fmod(self.x,178)
 
     if (self.x > 89) then
-		self.x = self.x - 178
+		self.x = 89
     elseif (self.x < -89) then
-		self.x = self.x + 178
+		self.x = -89
     end
 
-    self.y = math.modf(self.y,360)
+    self.y = math.fmod(self.y,360)
+    
     if (self.y < 0) then
 		self.y = self.y + 360
     end
@@ -558,6 +576,15 @@ function Angle:Normalized()
     return res
 end
 
+-- Global/Static/Helper functions
+function Angle:IsValid(angle)
+    if angle.x ~= angle.x or angle.y ~= angle.y or angle.z ~= angle.z then
+        return false
+    end
+
+    return true
+end
+
 local Math = {
     PI = 3.14159265358979323846
  }
@@ -575,11 +602,17 @@ function Math:CalcAngle(src,dst)
     local delta = Vector3D:new()
     delta:SetMembers(src.x - dst.x ,src.y - dst.y,src.z - dst.z)
 
+    if not Vector3D:IsValid(delta) then return nil end
+
     local hyp = math.sqrt(delta.x * delta.x + delta.y * delta.y)
 
-    vAngle.x = math.atan(delta.z / hyp) * 57.295779513082
-    vAngle.y = math.atan(delta.y / delta.x) * 57.295779513082
+    if hyp ~= hyp then return nil end
+
+    vAngle.x = math.atan(delta.z/hyp) * 57.295779513082
+    vAngle.y = math.atan(delta.y/delta.x) * 57.295779513082
     vAngle.z = 0.0
+
+    if not Angle:IsValid(vAngle) then return nil end
 
     if (delta.x >= 0.0) then
         vAngle.y = vAngle.y + 180.0
@@ -608,14 +641,12 @@ function Math:ClampAngles(angles)
     elseif (angles.x < -89.0) then
         angles.x = -89.0
     end
+    
 
-
-    while(angles.y > 180.0) do
-        angles.y = angles.y - 180.0
-    end
-
-    while(angles.y < -180.0) do
-        angles.y = angles.y + 180.0
+    if (angles.y > 180.0) then
+        angles.y = 180.0
+    elseif (angles.y < -180.0) then
+        angles.y = -180.0
     end
 
     angles.z = 0
@@ -716,12 +747,7 @@ function Math:VectorAngles(forward,angles)
 end
 
 function Math:Clamp(val, min, max)
-    if min > val then
-        val = min
-    elseif val > max then
-        val = max
-    end
-    return val
+    return math.max(min,math.min(val,max))
 end
 
 function Math:IsInBounds(PointToCheck, first_point, second_point)
@@ -729,6 +755,32 @@ function Math:IsInBounds(PointToCheck, first_point, second_point)
         return true
     end
     return false
+end
+
+function Math:SmoothAngle( from , to , percent )
+
+    percent = percent or 25
+
+    from:NormalizeTo180()
+    to:NormalizeTo180()
+	local VecDelta = from - to
+
+
+    VecDelta:NormalizeTo180()
+    
+	VecDelta.x = VecDelta.x * ( percent / 100.0 )
+	VecDelta.y = VecDelta.y * ( percent / 100.0 )
+
+
+    VecDelta:NormalizeTo180()
+
+
+
+    local DeltaLast = (from - VecDelta)
+    DeltaLast:NormalizeTo180()
+
+
+	return DeltaLast 
 end
 
 local function GetVirtualFunction(address,index)
@@ -875,12 +927,27 @@ local function GetClientEntity(entNum)
 end
 
 ffi.cdef [[
-	typedef bool (__thiscall* IsDrawingLoadingImage_FN) (uint32_t this);
+	typedef bool        (__thiscall* IsDrawingLoadingImage_FN)          (uint32_t this);
+    typedef bool        (__thiscall* IsTransitioningToLoad_FN)          (uint32_t this);
+    typedef bool        (__thiscall* IsClientLocalToActiveServer_FN)    (uint32_t this);
+    typedef char const* (__thiscall* GetLevelNameShort_FN)              (uint32_t this);
 ]]
 local g_EngineClient = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","VEngineClient014"))
 
-function EngineClient.IsDrawingLoadingImage()
+local function IsDrawingLoadingImage()
     return ffi.cast("IsDrawingLoadingImage_FN",GetVirtualFunction(g_EngineClient , 28))(g_EngineClient)
+end
+
+local function IsTransitioningToLoad()
+    return ffi.cast("IsTransitioningToLoad_FN",GetVirtualFunction(g_EngineClient , 182))(g_EngineClient)
+end
+
+local function GetLevelNameShort()
+    return ffi.cast("GetLevelNameShort_FN",GetVirtualFunction(g_EngineClient , 53))(g_EngineClient)
+end
+
+local function IsClientLocalToActiveServer()
+    return ffi.cast("IsClientLocalToActiveServer_FN",GetVirtualFunction(g_EngineClient , 197))(g_EngineClient)
 end
 
 local g_GameUI = ffi.cast("uint32_t",Utils.CreateInterface("client.dll","GameUI011"))
@@ -896,6 +963,10 @@ local function GetSignOnState()
     local SignOnState = ffi.cast("uint32_t*",(clientStatePtr + 264))[0]
     return SignOnState
 end
+
+local g_EngineVGUI = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","VEngineVGui001"))
+
+local scr_disabled_for_loading = ffi.cast("bool*",fnGetModuleHandle("engine.dll") + 0x62A115)
 
 local function DumpTable(o)
     if type(o) == 'table' then
@@ -944,9 +1015,67 @@ function FileBuffer:Read(SizeToRead)
     return TempVariable
 end
 
+Menu.Text("Walkbot","The settings below are advanced and it's optional to change them.")
+local IterationPerTick_Slider = Menu.SliderInt("Walkbot","Path finding iteration per ticks",1,1,1000,"Increasing this will make the path finding faster,at the cost of your FPS.")
+local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
+local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
+local ThresholdTime = Menu.SliderInt("Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
+local ThresholdTimeReset = Menu.SliderInt("Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
+local TimeToMove = Menu.SliderInt("Walkbot", "Enemy Last Seen Threshold", 1, 1, 10, "After this amount of time since the last time we saw an enemy,we will resume moving again.")
 
+local Aimbot_Enable = Menu.Switch("Aimbot","Enable",false,"Global switch for the aimbot.")
+local Aimbot_SilentAim = Menu.Switch("Aimbot","Silent Aim",false,"Prevents the aiming angles from applying to your engine angles.")
+local BodyAim_Switch = Menu.Switch("Aimbot","Prefer body aim",true,"Prioritizes aiming for the body.If not possible,aim for the head.")
+local Aimbot_Speed = Menu.SliderInt("Aimbot","Speed",10,1,100,"Controls the speed of the aimbot.")
 
+local AutoQueue_Switch = Menu.Switch("Misc", "Auto queue", true, "Automatically queues for you.")
+local AutoReconnect_Switch = Menu.Switch("Misc", "Auto reconnect", true, "Automatically reconnects to an ongoing match.")
+local AutoDisconnect_Switch = Menu.Switch("Misc", "Auto disconnect", true, "Automatically disconnects upon match end.")
+local e_hitboxes = {
+    HEAD	        = 0,
+    NECK	        = 1,
+    PELVIS	        = 2,
+    BODY	        = 3,
+    THORAX	        = 4,
+    CHEST	        = 5,
+    UPPER_CHEST	    = 6,
+    RIGHT_THIGH	    = 7,
+    LEFT_THIGH	    = 8,
+    RIGHT_CALF	    = 9,
+    LEFT_CALF	    = 10,
+    RIGHT_FOOT	    = 11,
+    LEFT_FOOT	    = 12,
+    RIGHT_HAND	    = 13,
+    LEFT_HAND	    = 14,
+    RIGHT_UPPER_ARM	= 15,
+    RIGHT_FOREARM	= 16,
+    LEFT_UPPER_ARM	= 17,
+    LEFT_FOREARM    = 18
+}
 
+local Hitboxes_Normal = {
+	e_hitboxes.HEAD			    ,
+	e_hitboxes.NECK	            ,
+	
+	e_hitboxes.UPPER_CHEST	    ,
+	e_hitboxes.CHEST	        ,
+	e_hitboxes.THORAX	        ,
+	e_hitboxes.BODY	            ,
+	e_hitboxes.PELVIS	        
+}
+
+local Hitboxes_BodyAim = {
+	
+	e_hitboxes.UPPER_CHEST	    ,
+	e_hitboxes.CHEST	        ,
+	e_hitboxes.THORAX	        ,
+	e_hitboxes.BODY	            ,
+	e_hitboxes.PELVIS	        ,
+	
+	e_hitboxes.NECK	            ,
+	e_hitboxes.HEAD			    
+	
+}
 
 
 --CustomBuffer:Read(4)
@@ -1774,7 +1903,8 @@ local function FindNearestPlayer(FromPlayer)
     for _,Player in ipairs(PlayerList) do
         if Player ~= FromPlayer and Player:IsPlayer() then
             local BasePlayer = Player:GetPlayer()
-            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and BasePlayer:EntIndex() ~= LastFoundPlayer then
+            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and BasePlayer:EntIndex() ~= LastFoundPlayer and not(BasePlayer:GetNetworkState() == -1 or BasePlayer:GetNetworkState() == 4) then
+
                 local PlayerOrigin = BasePlayer:GetProp("m_vecOrigin")
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
@@ -1790,11 +1920,83 @@ local function FindNearestPlayer(FromPlayer)
 
     if(NearestPlayer ~= nil)then
         LastFoundPlayer = NearestPlayer:EntIndex()
+    else
+        if LastFoundPlayer ~= nil then
+            local BasePlayer_LastFoundPlayer = EntityList.GetPlayer(LastFoundPlayer)
+            if BasePlayer_LastFoundPlayer and BasePlayer_LastFoundPlayer:IsPlayer() and BasePlayer_LastFoundPlayer:IsAlive() and not BasePlayer_LastFoundPlayer:IsTeamMate() and not(BasePlayer_LastFoundPlayer:GetNetworkState() == -1 or BasePlayer_LastFoundPlayer:GetNetworkState() == 4) then
+                NearestPlayer = BasePlayer_LastFoundPlayer
+            end
+        end
     end
     return NearestPlayer
 end
 
 
+
+local function IsVisible(FromPlayer,ToPlayer)
+    local FromPlayer_EyePos = FromPlayer:GetEyePosition()
+
+    if not BodyAim_Switch:Get() then
+        for _,hitbox in ipairs(Hitboxes_Normal) do 
+    
+            local ToPlayer_TargetPos = ToPlayer:GetHitboxCenter(hitbox)
+    
+            local trace_result = EngineTrace.TraceRay(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
+            if(trace_result.hit_entity and trace_result.hit_entity:EntIndex() == ToPlayer:EntIndex())then 
+                return hitbox
+            end
+        end
+    else
+        for _,hitbox in ipairs(Hitboxes_BodyAim) do 
+    
+            local ToPlayer_TargetPos = ToPlayer:GetHitboxCenter(hitbox)
+    
+            local trace_result = EngineTrace.TraceRay(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
+            if(trace_result.hit_entity and trace_result.hit_entity:EntIndex() == ToPlayer:EntIndex())then 
+                return hitbox
+            end
+        end
+    end
+    
+    return -1
+
+    -- print(trace_result.fraction)
+    -- print(trace_result.hit_entity:EntIndex())
+    
+end
+
+local function Aimbot__FindNearestPlayer(FromPlayer)
+    local PlayerList = EntityList.GetPlayers()
+
+    local NearestDistance = math.huge
+    local NearestPlayer = nil
+    local BestHitbox = nil
+    local FromPlayerEyePos = FromPlayer:GetEyePosition()
+    local FromPlayerPos = Vector3D:new(FromPlayerEyePos.x,FromPlayerEyePos.y,FromPlayerEyePos.z)
+
+    for _,Player in ipairs(PlayerList) do
+        if Player ~= FromPlayer and Player:IsPlayer() then
+            local BasePlayer = Player:GetPlayer()
+            local TempHitboxChoice = IsVisible(FromPlayer,BasePlayer)
+            
+            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and TempHitboxChoice > -1 then
+
+                local PlayerOrigin = BasePlayer:GetProp("m_vecOrigin")
+                local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
+
+                local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
+                if( DistanceToFromPlayer < NearestDistance) then
+                    NearestDistance = DistanceToFromPlayer
+                    NearestPlayer = BasePlayer
+                    BestHitbox = TempHitboxChoice
+                end
+            end
+            
+        end
+    end
+
+    return  { NearestPlayer , BestHitbox } 
+end
 
 local StartingNode = nil
 local EndArea = nil
@@ -1856,82 +2058,86 @@ local NeedToResetLists = true
 
 --local StartTime = GlobalVars.realtime
 local function FindPath()
+    local IterationsAllowed = IterationPerTick_Slider:Get()
+    local CurrentIteration = 0
 
-    CurrentNode = FindLowestScoreInList(OpenList)
+    while(CurrentIteration < IterationsAllowed) do 
+        CurrentNode = FindLowestScoreInList(OpenList)
 
-    if(CurrentNode == nil) then
-        OpenList = { }
-        ClosedList = { }
-        CurrentNode = nil
-        Path = { }
-        NeedToResetLists = true
-        return
-    end
+        if(CurrentNode == nil) then
+            OpenList = { }
+            ClosedList = { }
+            CurrentNode = nil
+            Path = { }
+            NeedToResetLists = true
 
-    if(CurrentNode.area == EndArea) then
-        if(#Path == 0 )then
-            --print(GlobalVars.realtime - StartTime)
-            --print("Found path.")
-            table.insert(Path,CurrentNode)
+            CurrentIteration = IterationsAllowed
+            break
+        end
 
-            local ParentNode = CurrentNode.parent
-            while ParentNode ~= StartingNode do
+        if(CurrentNode.area == EndArea) then
+            if(#Path == 0 )then
+                --print(GlobalVars.realtime - StartTime)
+                --print("Found path.")
+                table.insert(Path,CurrentNode)
+
+                local ParentNode = CurrentNode.parent
+                while ParentNode ~= StartingNode do
+                    table.insert(Path,ParentNode)
+                    ParentNode = ParentNode.parent
+                end
                 table.insert(Path,ParentNode)
-                ParentNode = ParentNode.parent
+                --print("Path Start ID: ",Path[#Path].area.m_id)
             end
-            table.insert(Path,ParentNode)
-            --print("Path Start ID: ",Path[#Path].area.m_id)
-            return
-        end
-        return
-    end
-
-    RemoveNodeFromList(OpenList,CurrentNode)
-    table.insert(ClosedList,CurrentNode)
-
-    for _,Connect in ipairs(CurrentNode.area.m_connect) do
-        local NeighborNode = AreaNode:new()
-        NeighborNode.area = Connect.area
-
-        if(IsNodeInList(ClosedList,NeighborNode))then
-            goto continue
+            CurrentIteration = IterationsAllowed
+            break
         end
 
-        if(IsNodeInList(OpenList,NeighborNode))then
-            --print("Already in list.")
-            local AlreadyExistingNode = GetNodeInList(OpenList,NeighborNode)
-            local UpdatedGScoreToCurrentNode = CurrentNode.g + CurrentNode.area.m_center:DistToManhattanVer(AlreadyExistingNode.area.m_center)
-            local UpdatedHScoreToCurrentNode = AlreadyExistingNode.area.m_center:DistToManhattanVer(EndArea.m_center)
-            local UpdatedFScoreToCurrentNode = UpdatedGScoreToCurrentNode + UpdatedHScoreToCurrentNode
+        RemoveNodeFromList(OpenList,CurrentNode)
+        table.insert(ClosedList,CurrentNode)
 
-            if(UpdatedFScoreToCurrentNode < AlreadyExistingNode.g) then
-                --print("Updating a node in the open list.")
-                AlreadyExistingNode.parent = CurrentNode
-                AlreadyExistingNode.g = UpdatedGScoreToCurrentNode
-                AlreadyExistingNode.h = UpdatedHScoreToCurrentNode
-                AlreadyExistingNode.f = UpdatedFScoreToCurrentNode
+        for _,Connect in ipairs(CurrentNode.area.m_connect) do
+            local NeighborNode = AreaNode:new()
+            NeighborNode.area = Connect.area
+
+            if(IsNodeInList(ClosedList,NeighborNode))then
+                goto continue
             end
-            goto continue
-        end
 
-        if (not IsNodeInList(OpenList,NeighborNode) and not IsNodeInList(ClosedList,NeighborNode)) then
-            NeighborNode.parent = CurrentNode
-            NeighborNode.g = CurrentNode.g + CurrentNode.area.m_center:DistToManhattanVer(NeighborNode.area.m_center)
-            NeighborNode.h = NeighborNode.area.m_center:DistToManhattanVer(EndArea.m_center)
-            NeighborNode.f = NeighborNode.g + NeighborNode.h
-            table.insert(OpenList,NeighborNode)
-            goto continue
-        end
+            if(IsNodeInList(OpenList,NeighborNode))then
+                --print("Already in list.")
+                local AlreadyExistingNode = GetNodeInList(OpenList,NeighborNode)
+                local UpdatedGScoreToCurrentNode = CurrentNode.g + CurrentNode.area.m_center:DistToManhattanVer(AlreadyExistingNode.area.m_center)
+                local UpdatedHScoreToCurrentNode = AlreadyExistingNode.area.m_center:DistToManhattanVer(EndArea.m_center)
+                local UpdatedFScoreToCurrentNode = UpdatedGScoreToCurrentNode + UpdatedHScoreToCurrentNode
 
-        ::continue::
+                if(UpdatedFScoreToCurrentNode < AlreadyExistingNode.g) then
+                    --print("Updating a node in the open list.")
+                    AlreadyExistingNode.parent = CurrentNode
+                    AlreadyExistingNode.g = UpdatedGScoreToCurrentNode
+                    AlreadyExistingNode.h = UpdatedHScoreToCurrentNode
+                    AlreadyExistingNode.f = UpdatedFScoreToCurrentNode
+                end
+                goto continue
+            end
+
+            if (not IsNodeInList(OpenList,NeighborNode) and not IsNodeInList(ClosedList,NeighborNode)) then
+                NeighborNode.parent = CurrentNode
+                NeighborNode.g = CurrentNode.g + CurrentNode.area.m_center:DistToManhattanVer(NeighborNode.area.m_center)
+                NeighborNode.h = NeighborNode.area.m_center:DistToManhattanVer(EndArea.m_center)
+                NeighborNode.f = NeighborNode.g + NeighborNode.h
+                table.insert(OpenList,NeighborNode)
+                goto continue
+            end
+
+            ::continue::
+        end
+        CurrentIteration = CurrentIteration + 1
     end
-
 end
 
-Menu.Text("Walkbot","The settings below are advanced and it's optional to change them.")
 
-local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
-local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
+
 
 local function CheckIfArrivedAtNode(cmd)
     local local_player = EntityList.GetLocalPlayer()
@@ -2023,8 +2229,6 @@ local NotMovingTicks = 1
 
 -- TODO : Use curtime / realtime instead of tickcount and get a better name for these namings and better descriptions
 -- TODO : Use better methods of keeping track of time instead of using these modulo operations
-local ThresholdTime = Menu.SliderInt("Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
-local ThresholdTimeReset = Menu.SliderInt("Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
 
 local CycleAttempt = 1 
 local CycleMethods = 8
@@ -2094,20 +2298,23 @@ local function ObstacleAvoid(cmd)
             local LocalEyePosCustom = Vector3D:new()
             LocalEyePosCustom:CopyOther(LocalEyePos)
 
-            local VectorToUseCustom = NodeToMoveTo.area.m_center
-            local VectorToUse = Vector.new(VectorToUseCustom.x,VectorToUseCustom.y,VectorToUseCustom.z)
+            -- local VectorToUseCustom = NodeToMoveTo.area.m_center
+            -- local VectorToUse = Vector.new(VectorToUseCustom.x,VectorToUseCustom.y,VectorToUseCustom.z)
 
-            local traced = EngineTrace.TraceRay(LocalEyePos, VectorToUse, local_player, 0xFFFFFFFF)
+            -- local traced = EngineTrace.TraceRay(LocalEyePos, VectorToUse, local_player, 0x46004003)
 
-            local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
-            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,TracedEndPosCustom)
+            -- local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
+            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,NodeToMoveTo.area.m_center)
+
+            if AngleToVectorUse == nil then return end
+            
+            AngleToVectorUse:NormalizeTo180()
 
             cmd.forwardmove = 0.0
             cmd.sidemove = 0.0
             cmd.viewangles.pitch = AngleToVectorUse.x
             cmd.viewangles.yaw = AngleToVectorUse.y
-            AntiAim.OverridePitch(AngleToVectorUse.x)
-            AntiAim.OverrideYawOffset(AngleToVectorUse.y)
+
             cmd.buttons = bit.bor(cmd.buttons,32)
 
             
@@ -2120,25 +2327,25 @@ local function ObstacleAvoid(cmd)
             local VectorToUseCustom = NodeToMoveTo.area.m_center
             local VectorToUse = Vector.new(VectorToUseCustom.x,VectorToUseCustom.y,VectorToUseCustom.z)
 
-            local traced = EngineTrace.TraceRay(LocalEyePos, VectorToUse, local_player, 0xFFFFFFFF)
-
-            local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
-            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,TracedEndPosCustom)
-
-            cmd.forwardmove = 0.0
-            cmd.sidemove = 0.0
-            cmd.viewangles.pitch = AngleToVectorUse.x
-            cmd.viewangles.yaw = AngleToVectorUse.y
-
-
-            AntiAim.OverridePitch(AngleToVectorUse.x)
-            AntiAim.OverrideYawOffset(AngleToVectorUse.y)
+            local traced = EngineTrace.TraceRay(LocalEyePos, VectorToUse, local_player, 0x46004003)
 
             if(traced.hit_entity and traced.hit_entity:IsPlayer()) then
                 if(traced.hit_entity:GetPlayer():IsTeamMate()) then
                     return
                 end
             end
+
+            local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
+            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,NodeToMoveTo.area.m_center)
+
+            if AngleToVectorUse == nil then return end
+
+            AngleToVectorUse:NormalizeTo180()
+            
+            cmd.forwardmove = 0.0
+            cmd.sidemove = 0.0
+            cmd.viewangles.pitch = AngleToVectorUse.x
+            cmd.viewangles.yaw = AngleToVectorUse.y
 
             cmd.buttons = bit.bor(cmd.buttons,1)
 
@@ -2160,18 +2367,22 @@ local function ObstacleAvoid(cmd)
     end
 end
 
-
+local TimeSinceLastSeenEnemy = 0
 
 local function MoveToTarget(cmd)
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
 
     local local_player = EntityList.GetLocalPlayer()
     local local_player_pos = local_player:GetRenderOrigin()
+    local local_weapon = local_player:GetActiveWeapon()
 
     local view_angles = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
     -- local cmd_view_angles = Angle:MakeNewAngleFromNLAngle(cmd.viewangles)
     local NodeToMoveTo = Path[#Path]
 
     local AngleToNode = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
+
+    if AngleToNode == nil then return end
 
     view_angles.x = 0.0
     AngleToNode.x = 0.0
@@ -2185,13 +2396,183 @@ local function MoveToTarget(cmd)
 
 
     Math:AngleVectors(AngleToNode,forward)
-
-    forward = forward:MultiplySingle(450)
+    -- print(TimeSinceLastSeenEnemy)
+    if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
+        forward = forward:MultiplySingle(450)
+    else
+        if local_weapon and not local_weapon:IsReloading() then
+            -- print("Stopping to max weapon speed")
+            local weapon_max_speed = local_weapon:GetMaxSpeed()
+            local weapon_speed_max_accuracy = weapon_max_speed * 0.25
+            forward = forward:MultiplySingle(weapon_speed_max_accuracy)
+        end
+    end
+    
 
 
     cmd.forwardmove = forward.x
     cmd.sidemove = forward.y
 
+end
+
+local function CanLocalPlayerShoot()
+    local local_player = EntityList.GetLocalPlayer()
+    local local_weapon = local_player:GetActiveWeapon()
+    local local_player_from_weapon_handle = EntityList.GetClientEntityFromHandle(local_weapon:GetProp("m_hOwnerEntity")):GetPlayer()
+
+    if not ( local_player_from_weapon_handle or local_weapon or local_player ) then
+        return false
+    end
+
+    local weapon__clip1                 = local_weapon:GetProp("m_iClip1")
+    local weapon__m_flNextPrimaryAttack = local_weapon:GetProp("m_flNextPrimaryAttack")
+    local local_player__m_nTickBase     = local_player_from_weapon_handle:GetProp("m_nTickBase")
+    local local_player__m_flNextAttack  = local_player_from_weapon_handle:GetProp("m_flNextAttack")
+
+    if(local_weapon:IsReloading() or weapon__clip1 <= 0)then
+        return false
+    end
+
+    local flServerTime = local_player__m_nTickBase * GlobalVars.interval_per_tick
+
+    if(local_player__m_flNextAttack > flServerTime)then
+        return false
+    end
+
+    return (weapon__m_flNextPrimaryAttack <= flServerTime)
+end
+
+local function CanHit_Angle(StartPos,CurrentAngle,PlayerSkip)
+
+    local VectorFromAngle = Vector3D:new()
+    Math:AngleVectors(CurrentAngle,VectorFromAngle)
+    VectorFromAngle = VectorFromAngle:MultiplySingle(8192.0)
+    VectorFromAngle = VectorFromAngle + StartPos
+    
+    local VectorFromAngle_Converted = Vector.new(VectorFromAngle.x,VectorFromAngle.y,VectorFromAngle.z)
+    local trace_result = EngineTrace.TraceRay(StartPos, VectorFromAngle_Converted, PlayerSkip, 0x46004003)
+
+    return (trace_result.hit_entity and trace_result.hit_entity:IsPlayer() and not trace_result.hit_entity:GetPlayer():IsTeamMate())
+
+end
+
+local function BeMoreAccurate(cmd)
+
+    -- local local_player = EntityList.GetLocalPlayer()
+    -- -- local velocity_prop = local_player:GetProp("m_vecVelocity[0]")
+    -- local velocity = Vector3D:new(local_player:GetProp("m_vecVelocity[0]"),local_player:GetProp("m_vecVelocity[1]"),local_player:GetProp("m_vecVelocity[2]"))
+    -- -- velocity:CopyOther(velocity_prop)
+
+    -- local direction = Angle:new()
+    -- Math:VectorAngles(velocity,direction)
+
+    -- local forward_vector = Vector3D:new()
+    -- Math:AngleVectors(direction,forward_vector)
+
+    -- local speed = velocity:Length()
+
+    -- direction.y = cmd.viewangles.yaw - direction.y
+
+    -- local negated_direction = forward_vector:MultiplySingle(-speed)
+
+    -- cmd.forwardmove = negated_direction.x
+    -- cmd.sidemove = negated_direction.y
+
+    local local_player = EntityList.GetLocalPlayer()
+    local local_weapon = local_player:GetActiveWeapon()
+
+    if local_weapon and not local_weapon:IsReloading() then
+        -- print("Stopping to max weapon speed")
+        local weapon_max_speed = local_weapon:GetMaxSpeed()
+        local weapon_speed_max_accuracy = weapon_max_speed * 0.25
+        cmd.forwardmove = Math:Clamp(cmd.forwardmove,-(weapon_speed_max_accuracy),weapon_speed_max_accuracy)
+        cmd.sidemove = Math:Clamp(cmd.sidemove,-(weapon_speed_max_accuracy),weapon_speed_max_accuracy)
+    else
+        cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
+        cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
+    end
+
+    cmd.buttons = bit.band(cmd.buttons,-3)
+    
+    -- print("stopping")
+end
+
+local RecoilScale = CVar.FindVar("weapon_recoil_scale")
+
+
+
+local LatestTargetAngle = Angle:new()
+local LatestAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
+
+
+local function Aimbot(cmd)
+    if not Aimbot_Enable:Get() then 
+        TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
+        return 
+    end
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
+
+    TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
+    local NodeToMoveTo = Path[#Path]
+
+    local local_player = EntityList.GetLocalPlayer()
+    local local_player_pos = local_player:GetEyePosition()
+
+    local local_aimpunch = Angle:MakeNewAngleFromNLVector(local_player:GetProp("m_aimPunchAngle"))
+    local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:GetFloat())
+
+    local TargetPlayerAndHitbox = Aimbot__FindNearestPlayer(local_player)
+
+    if TargetPlayerAndHitbox[1] ~= nil and TargetPlayerAndHitbox[2] ~= nil and Vector3D:IsValid(local_player_pos) then 
+        TimeSinceLastSeenEnemy = 0
+        BeMoreAccurate(cmd)
+        local TargetHitbox = TargetPlayerAndHitbox[1]:GetHitboxCenter(TargetPlayerAndHitbox[2])
+        
+        if Vector3D:IsValid(TargetHitbox) then
+            local AngleToTarget = Math:CalcAngle(local_player_pos,TargetHitbox)
+            if(AngleToTarget ~= nil)then 
+                LatestTargetAngle = AngleToTarget - local_aimpunch
+            end
+        end
+    else
+        if NodeToMoveTo and TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
+            if Vector3D:IsValid(NodeToMoveTo.area.m_center)then
+                local AngleToTarget = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
+
+                if(AngleToTarget ~= nil)then 
+                    LatestTargetAngle = AngleToTarget
+                    LatestTargetAngle.x = 0.00
+                    LatestTargetAngle.z = 0.00
+                end
+            end
+            
+        end
+        -- LatestTargetAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
+    end
+    
+    LatestAngle = Math:SmoothAngle(LatestAngle,LatestTargetAngle,Aimbot_Speed:Get())
+    -- LatestAngle:PrintValueClean()
+    LatestAngle:NormalizeTo180()
+    
+    -- print(Math:GetFOV(LatestAngle,AngleToTarget))
+    -- if Math:GetFOV(LatestAngle,LatestTargetAngle) <= Aimbot_Shoot_Range:Get() then
+    --     cmd.buttons = bit.bor(cmd.buttons,1)
+    -- end
+    
+    cmd.viewangles.pitch = LatestAngle.x
+    cmd.viewangles.yaw = LatestAngle.y
+    
+    if CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player) and CanLocalPlayerShoot() then
+        cmd.buttons = bit.bor(cmd.buttons,1)
+    end
+
+    -- EngineClient.SetViewAngles(QAngle.new(cmd.viewangles.pitch,cmd.viewangles.yaw,0.0))
+    -- if LatestAngle.y ~= LatestAngle.y then
+    --     print("ADWOIJNIIIIIININININININININININININNAODINAWIODNAW")
+    -- end
+    -- LatestAngle:PrintValueClean()
+    
+    -- cmd.buttons = bit.bor(cmd.buttons,1)
 end
 
 -- TODO : Breakable test for doors or vents blocking our way.For now,we're not checking for breakable and just bruteforce it in the cycle attempt.
@@ -2215,7 +2596,7 @@ end
 
 --     -- local filter = ffi.new("ITraceFilter*")
 --     -- filter.pSkip = GetClientEntity(local_player_index)
---     -- TraceRay(ray,0xFFFFFFFF,filter,trace)
+--     -- TraceRay(ray,0x46004003,filter,trace)
 
 --     local local_player = EntityList.GetLocalPlayer()
 --     local local_player_index = local_player:EntIndex()
@@ -2241,7 +2622,7 @@ end
 --     -- local filter = ffi.new("ITraceFilter*")
 --     -- filter.pSkip = GetClientEntity(local_player_index)
 
---     local traced = EngineTrace.TraceRay(local_eye_pos, ShootVector, local_player, 0xFFFFFFFF)
+--     local traced = EngineTrace.TraceRay(local_eye_pos, ShootVector, local_player, 0x46004003)
 --     -- print(traced.hit_entity:EntIndex())
 --     -- print(traced.hit_entity:GetClassName())
 --     -- print(IsBreakableEntity(GetClientEntity(traced.hit_entity:EntIndex())))
@@ -2267,6 +2648,10 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
     local entity = EntityList.GetClientEntity(EngineClient.GetLocalPlayer())
     local player = entity:GetPlayer()
     local active_weapon = player:GetActiveWeapon()
+
+    if not(entity or player or player:IsAlive())then
+        return
+    end
 
     if (GlobalVars.tickcount % (tickrate * 0.5) == 0 and m_iPlayerC4 == player:EntIndex()) then
         if(active_weapon:GetClassId() == 34)then
@@ -2296,8 +2681,9 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
         return
     end
 
-    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded --[[ and not ShouldStop ]] and not((GlobalVars.m_bRemoteClient and m_bWarmupPeriod) or m_bFreezePeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
+    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not((GlobalVars.m_bRemoteClient and m_bWarmupPeriod) or m_bFreezePeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
         --print("Iteration : ",iteration)
+        
         if(#Path == 0) then
             if(NeedToResetLists)then
                 --print("PATH 0")
@@ -2311,22 +2697,32 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
             end
         else
             --print("ELSE PATH 0")
+            
+            
             MoveToTarget(cmd)
             ObstacleAvoid(cmd)
             CheckIfArrivedAtNode(cmd)
-
         end
+        if not (bit.band(cmd.buttons,1) ~= 0)then 
+            Aimbot(cmd)
+        end
+        
     end
-    FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
+    -- FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
+    -- print("Clamping")
     cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
     cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
 
     cmd.viewangles.pitch = Math:Clamp(cmd.viewangles.pitch ,-89,89)
     cmd.viewangles.yaw = Math:Clamp(cmd.viewangles.yaw ,-180,180)
     cmd.viewangles.roll = 0.0
+    if not Aimbot_SilentAim:Get() then
+        EngineClient.SetViewAngles(cmd.viewangles)
+    end
 end)
-local AutoQueue_Switch = Menu.Switch("Misc", "Auto queue", true, "Automatically queues for you.")
-local Queue = Panorama.LoadString([[
+
+
+local AutoQueuePanorama = Panorama.LoadString([[
     function queueMatchmaking() 
         {
             if (!LobbyAPI.BIsHost()) 
@@ -2334,22 +2730,19 @@ local Queue = Panorama.LoadString([[
                 LobbyAPI.CreateSession();
             }
             
-            //if (CompetitiveMatchAPI.HasOngoingMatch() && !GameStateAPI.IsConnectedOrConnectingToServer() )
-            //{
-            //    CompetitiveMatchAPI.ActionReconnectToOngoingMatch();
-            //    return;
-            //}
-
             if 
             (
                 !( 
                     GameStateAPI.IsConnectedOrConnectingToServer() || 
                     LobbyAPI.GetMatchmakingStatusString() || 
                     CompetitiveMatchAPI.GetCooldownSecondsRemaining() > 0 || 
-                    CompetitiveMatchAPI.HasOngoingMatch() 
+                    CompetitiveMatchAPI.HasOngoingMatch()  ||
+                    GameStateAPI.IsLocalPlayerPlayingMatch() || 
+                    GameStateAPI.IsLocalPlayerWatchingOwnDemo()
                 ) 
             ) 
             {
+                $.Msg("StartMatchmaking");
                 LobbyAPI.StartMatchmaking("", "", "", "");
             }
             
@@ -2357,16 +2750,64 @@ local Queue = Panorama.LoadString([[
     
         queueMatchmaking();	
 ]])
+local panorama = Panorama.Open()
+
+local function AutoQueue()
+    if(AutoQueue_Switch:Get() and not IsDrawingLoadingImage() and not IsClientLocalToActiveServer() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
+        AutoQueuePanorama()
+        
+        -- if ( not panorama.LobbyAPI.BIsHost()) then
+        --     panorama.LobbyAPI.CreateSession()
+        -- end
+        
+        -- if (not panorama.GameStateAPI.IsConnectedOrConnectingToServer() and panorama.LobbyAPI.GetMatchmakingStatusString() == "" and panorama.CompetitiveMatchAPI.GetCooldownSecondsRemaining() == 0 and not panorama.CompetitiveMatchAPI.HasOngoingMatch() ) then
+        --     -- print("::::::::::::::::::::::::::::::::::::::StartMatchmaking::::::::::::::::::::::::::::::::::::::")
+        --     panorama.LobbyAPI.StartMatchmaking("", "", "", "")
+        -- end
+    end
+end
+
+local AlreadyAttemptedToReconnect = false
+local function AutoReconnect()
+    if not AlreadyAttemptedToReconnect then
+        if(AutoReconnect_Switch:Get() and not IsDrawingLoadingImage() and not IsClientLocalToActiveServer() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
+            if (panorama.CompetitiveMatchAPI.HasOngoingMatch() and not panorama.GameStateAPI.IsConnectedOrConnectingToServer() ) then
+                panorama.CompetitiveMatchAPI.ActionReconnectToOngoingMatch()
+                AlreadyAttemptedToReconnect = true
+                -- print("::::::::::::::::::::::::::::::::::::::ActionReconnectToOngoingMatch::::::::::::::::::::::::::::::::::::::")
+            end
+        end
+    end
+end
+Cheat.RegisterCallback("frame_stage", function(stage)
+    if stage ~= 6 then return end
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
+    if( GlobalVars.tickcount % tickrate * 5 == 0 ) then
+        AutoReconnect()
+        AutoQueue()
+    end
+    
+end)
 
 Cheat.RegisterCallback("draw", function()
 
     -- print(GetGameState())
-    -- print(GetSignOnState())
-    -- print(EngineClient.IsDrawingLoadingImage())
-    if(AutoQueue_Switch:Get() and (math.ceil(GlobalVars.curtime) % 10 == 0 ) and not EngineClient.IsDrawingLoadingImage() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
-        Queue()
-    end
-
+    -- print(IsDrawingLoadingImage())
+    -- print(IsDrawingLoadingImage())
+    -- local m_bShowProgressDialog = ffi.cast("bool*",g_EngineVGUI + 0x58)[0]
+    -- print(m_bShowProgressDialog)
+    -- print(IsTransitioningToLoad())  
+    -- if scr_disabled_for_loading[0] == true then 
+    --     print("scr_disabled_for_loading :::::::::::::::: " , scr_disabled_for_loading[0])
+    -- end
+    
+    -- print(IsClientLocalToActiveServer())
+    -- if math.ceil(GlobalVars.curtime) % 2 == 0 then 
+    -- AutoReconnect()
+    -- AutoQueue()
+    -- end
+    
+    
     --print(#Path)
     if #Path == 0 then
         --if(CurrentNode ~= nil)then
@@ -2434,9 +2875,8 @@ Cheat.RegisterCallback("draw", function()
     end
 end)
 
-
 Cheat.RegisterCallback("events", function(event)
-
+    local tickrate = 1.0 / GlobalVars.interval_per_tick
     -- print(event:GetName())
 
     -- if (event:GetName() == "round_prestart") then
@@ -2458,9 +2898,15 @@ Cheat.RegisterCallback("events", function(event)
 	-- 	ShouldStop = true
     --     goto continue
     -- end
+    if (event:GetName() == "cs_win_panel_match") and (AutoDisconnect_Switch:Get() or false) then
+        EngineClient.ExecuteClientCmd("disconnect")
+        goto continue
+    end
+    if (event:GetName() == "cs_game_disconnected") then
+        -- print("cs_game_disconnected")
 
-    if(event:GetName() == "cs_game_disconnected") then
-        print("cs_game_disconnected")
+        AlreadyAttemptedToReconnect = false
+
         INavFile.m_isLoaded = false
         OpenList = { }
         ClosedList = { }
@@ -2470,6 +2916,7 @@ Cheat.RegisterCallback("events", function(event)
         goto continue
     end
     if (event:GetName() == "player_spawn") then
+        TimeSinceLastSeenEnemy = tickrate * TimeToMove:Get()
         local local_player = EntityList.GetLocalPlayer()
         if local_player == nil then
             return
