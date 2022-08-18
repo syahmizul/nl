@@ -108,7 +108,7 @@ local Vector3D = require("nl/Vector")
 local Angle = require("nl/QAngle")
 local Math = require("nl/Math")
 
- local function GetVirtualFunction(address,index)
+local function GetVirtualFunction(address,index)
     local vtable = ffi.cast("uint32_t**",address)[0]
     return ffi.cast("uint32_t",vtable[index])
  end
@@ -346,16 +346,25 @@ local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 
 local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
 local ThresholdTime = Menu.SliderInt("Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
 local ThresholdTimeReset = Menu.SliderInt("Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
-local TimeToMove = Menu.SliderInt("Walkbot", "Enemy Last Seen Threshold", 1, 1, 10, "After this amount of time since the last time we saw an enemy,we will resume moving again.")
+local TimeToMove = Menu.SliderFloat("Walkbot", "Enemy Last Seen Threshold", 1.00, 0.01, 10.00, "After this amount of time since the last time we saw an enemy,we will resume moving again.")
 
 local Aimbot_Enable = Menu.Switch("Aimbot","Enable",false,"Global switch for the aimbot.")
 local Aimbot_SilentAim = Menu.Switch("Aimbot","Silent Aim",false,"Prevents the aiming angles from applying to your engine angles.")
 local BodyAim_Switch = Menu.Switch("Aimbot","Prefer body aim",true,"Prioritizes aiming for the body.If not possible,aim for the head.")
 local Aimbot_Speed = Menu.SliderInt("Aimbot","Speed",10,1,100,"Controls the speed of the aimbot.")
+local Aimbot_Hitchance = Menu.SliderInt("Aimbot","Hitchance",50,1,100,"Enforces more accuracy to the aimbot's shots.")
+local Aimbot_Enforce_Hitbox = Menu.Switch("Aimbot","Force Shoot Center Hitbox",false,"By default,the aimbot will shoot with whatever angle it is at.With this enabled,the aimbot will forcefully shoot the center of the hitbox,making the shot more accurate.This might make your aimbot look more obvious.")
+
+local Aimbot_AutoReload_Switch = Menu.Switch("Aimbot","Enable Auto Reload",true,"")
+local Aimbot_AutoReload = Menu.SliderInt("Aimbot","Auto Reload Threshold",25,1,100,"If your active weapon's ammo goes below this amount in percentage,it will automatically reload your weapon.")
 
 local AutoQueue_Switch = Menu.Switch("Misc", "Auto queue", true, "Automatically queues for you.")
 local AutoReconnect_Switch = Menu.Switch("Misc", "Auto reconnect", true, "Automatically reconnects to an ongoing match.")
 local AutoDisconnect_Switch = Menu.Switch("Misc", "Auto disconnect", true, "Automatically disconnects upon match end.")
+local AutoWeaponSwitch_Switch = Menu.Switch("Misc", "Auto switch to best weapon", true, "Automatically switches to the best weapon in your weapon slots.")
+
+local Precomputed_Seeds = {}
+
 local e_hitboxes = {
     HEAD	        = 0,
     NECK	        = 1,
@@ -1044,7 +1053,7 @@ function INavFile:Load(Buffer)
 end
 local function LoadMap(MapName)
 
-    local MapConcattedWithDirectory = "csgo\\maps\\" .. MapName .. ".nav"
+    local MapConcattedWithDirectory = EngineClient.GetGameDirectory() .. "\\maps\\" .. MapName .. ".nav"
 
     local fileHandle = ffi.C.CreateFileA(MapConcattedWithDirectory,0x10000000,0x1,0,4,0x80,0)
 
@@ -1228,9 +1237,10 @@ local function FindNearestPlayer(FromPlayer)
     for _,Player in ipairs(PlayerList) do
         if Player ~= FromPlayer and Player:IsPlayer() then
             local BasePlayer = Player:GetPlayer()
-            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and BasePlayer:EntIndex() ~= LastFoundPlayer and not(BasePlayer:GetNetworkState() == -1 or BasePlayer:GetNetworkState() == 4) then
+            local NetworkState = BasePlayer:GetNetworkState() 
+            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and BasePlayer:EntIndex() ~= LastFoundPlayer and (NetworkState == 1 or NetworkState == 0) then
 
-                local PlayerOrigin = BasePlayer:GetProp("m_vecOrigin")
+                local PlayerOrigin = BasePlayer:GetRenderOrigin()
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
                 local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
@@ -1248,9 +1258,13 @@ local function FindNearestPlayer(FromPlayer)
     else
         if LastFoundPlayer ~= nil then
             local BasePlayer_LastFoundPlayer = EntityList.GetPlayer(LastFoundPlayer)
-            if BasePlayer_LastFoundPlayer and BasePlayer_LastFoundPlayer:IsPlayer() and BasePlayer_LastFoundPlayer:IsAlive() and not BasePlayer_LastFoundPlayer:IsTeamMate() and not(BasePlayer_LastFoundPlayer:GetNetworkState() == -1 or BasePlayer_LastFoundPlayer:GetNetworkState() == 4) then
-                NearestPlayer = BasePlayer_LastFoundPlayer
+            if BasePlayer_LastFoundPlayer then 
+                local NetworkState = BasePlayer_LastFoundPlayer:GetNetworkState()
+                if BasePlayer_LastFoundPlayer:IsPlayer() and BasePlayer_LastFoundPlayer:IsAlive() and not BasePlayer_LastFoundPlayer:IsTeamMate() and (NetworkState == 1 or NetworkState == 0) then
+                    NearestPlayer = BasePlayer_LastFoundPlayer
+                end
             end
+            
         end
     end
     return NearestPlayer
@@ -1700,6 +1714,16 @@ local function MoveToTarget(cmd)
     local local_player = EntityList.GetLocalPlayer()
     local local_player_pos = local_player:GetRenderOrigin()
     local local_weapon = local_player:GetActiveWeapon()
+    
+    -- for k,weapon_handle in ipairs(weapon_list)do
+    --     local weapon= EntityList.GetClientEntityFromHandle(weapon_handle):GetWeapon()
+    --     if(weapon:IsRifle() or weapon:IsSniper())then
+    --         EngineClient.ExecuteClientCmd("slot1")
+    --         break
+    --     elseif condition then
+    --         -- :IsPistol()
+    --     end
+    -- end
 
     local view_angles = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
     -- local cmd_view_angles = Angle:MakeNewAngleFromNLAngle(cmd.viewangles)
@@ -1724,12 +1748,17 @@ local function MoveToTarget(cmd)
     -- print(TimeSinceLastSeenEnemy)
     if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
         forward = forward:MultiplySingle(450)
+        if local_player:GetProp("m_bIsScoped") then
+            cmd.buttons = bit.bor(cmd.buttons,2048)
+        end
     else
         if local_weapon and not local_weapon:IsReloading() then
             -- print("Stopping to max weapon speed")
             local weapon_max_speed = local_weapon:GetMaxSpeed()
             local weapon_speed_max_accuracy = weapon_max_speed * 0.25
             forward = forward:MultiplySingle(weapon_speed_max_accuracy)
+        else
+            forward = forward:MultiplySingle(450)
         end
     end
     
@@ -1738,6 +1767,97 @@ local function MoveToTarget(cmd)
     cmd.forwardmove = forward.x
     cmd.sidemove = forward.y
 
+end
+
+local function PrecomputeSeed()
+	
+	
+	for seed=1,255 do
+	
+		local random_values = { }
+	
+		Utils.RandomSeed(bit.band(seed,0xff) + 1)
+	
+		table.insert(random_values,Utils.RandomFloat(0.0,1.0))
+		table.insert(random_values,Utils.RandomFloat(0.0,Math.PI_2))
+		table.insert(random_values,Utils.RandomFloat(0.0,1.0))
+		table.insert(random_values,Utils.RandomFloat(0.0,Math.PI_2))
+		
+		
+		table.insert(Precomputed_Seeds,random_values)
+	end
+	
+end
+
+local function CalculateSpread(weapon,seed,inaccuracy,spread)
+    if not weapon or weapon:GetProp("m_iClip1") == 0 then
+        return Vector3D:new()
+    end
+
+    local r1 = Precomputed_Seeds[seed][1]
+	local r2 = Precomputed_Seeds[seed][2]
+	local r3 = Precomputed_Seeds[seed][3]
+	local r4 = Precomputed_Seeds[seed][4]
+
+	local c1 = math.cos(r2)
+	local c2 = math.cos(r4)
+	local s1 = math.sin(r2)
+	local s2 = math.sin(r4)
+	
+	return Vector3D:new(
+		(c1 * (r1 * inaccuracy)) + (c2 * (r3 * spread)),
+		(s1 * (r1 * inaccuracy)) + (s2 * (r3 * spread)),
+		0.0
+    )
+    
+end
+
+local function CheckHitchance(angleToTarget,entity)
+    local local_player  = EntityList.GetLocalPlayer()
+    local weapon        = local_player:GetActiveWeapon() 
+
+    local lp_eyepos     = local_player:GetEyePosition()
+    
+    local forward             = Vector3D:new()
+    local right                 = Vector3D:new()
+    local up                    = Vector3D:new()
+
+    Math:AngleVectorsExtra(angleToTarget,forward,right,up)
+
+    local spread            = weapon:GetSpread(weapon)
+    local inaccuracy    = weapon:GetInaccuracy(weapon)  
+
+    local needed_hits   =  math.ceil((Aimbot_Hitchance:Get() / 100) * 255)
+    local total_hits        = 0
+
+    for i = 1,255 do
+        local wep_spread = CalculateSpread(weapon,i,inaccuracy,spread)
+
+        local dir = Vector3D:new(
+            forward.x + (right.x * wep_spread.x) + (up.x * wep_spread.y),
+            forward.y + (right.y * wep_spread.x) + (up.y * wep_spread.y),
+            forward.z + (right.z * wep_spread.x) + (up.z * wep_spread.y)
+        )
+
+        local EndVec = Vector3D:new(
+            lp_eyepos.x + (dir.x * 8192.0),
+            lp_eyepos.y + (dir.y * 8192.0),
+            lp_eyepos.z + (dir.z * 8192.0)
+        )
+
+        local trace_result = EngineTrace.TraceRay(lp_eyepos, Vector.new(EndVec.x, EndVec.y, EndVec.z), local_player, 0x46004003)
+
+        if (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == entity:EntIndex()) then
+            total_hits = total_hits + 1
+        end
+
+        if (total_hits >= needed_hits) then
+            return true
+        end
+
+
+    end
+    return false
 end
 
 local function CanLocalPlayerShoot()
@@ -1831,6 +1951,7 @@ local LatestAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
 
 
 local function Aimbot(cmd)
+
     if not Aimbot_Enable:Get() then 
         TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
         return 
@@ -1842,7 +1963,20 @@ local function Aimbot(cmd)
 
     local local_player = EntityList.GetLocalPlayer()
     local local_player_pos = local_player:GetEyePosition()
+    local local_weapon = local_player:GetActiveWeapon()
 
+    if Aimbot_AutoReload_Switch:Get() and local_weapon and not local_weapon:IsReloading() then
+        local clip = local_weapon:GetProp("DT_BaseCombatWeapon", "m_iClip1")
+        local max_clip = local_weapon:GetMaxClip()
+
+        local current_clip_percentage = clip / max_clip
+
+        if(current_clip_percentage < ( Aimbot_AutoReload:Get() / 100 ) ) then
+            cmd.buttons = bit.bor(cmd.buttons,8192)
+        end
+    end
+
+    
     local local_aimpunch = Angle:MakeNewAngleFromNLVector(local_player:GetProp("m_aimPunchAngle"))
     local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:GetFloat())
 
@@ -1851,6 +1985,10 @@ local function Aimbot(cmd)
     if TargetPlayerAndHitbox[1] ~= nil and TargetPlayerAndHitbox[2] ~= nil and Vector3D:IsValid(local_player_pos) then 
         TimeSinceLastSeenEnemy = 0
         BeMoreAccurate(cmd)
+        if local_weapon:GetProp("m_zoomLevel") == 0 and local_weapon:IsSniper() and bit.band(cmd.buttons,2048) == 0 then
+            cmd.buttons = bit.bor(cmd.buttons,2048)
+        end
+
         local TargetHitbox = TargetPlayerAndHitbox[1]:GetHitboxCenter(TargetPlayerAndHitbox[2])
         
         if Vector3D:IsValid(TargetHitbox) then
@@ -1887,10 +2025,17 @@ local function Aimbot(cmd)
     cmd.viewangles.pitch = LatestAngle.x
     cmd.viewangles.yaw = LatestAngle.y
     
-    if CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player) and CanLocalPlayerShoot() then
+
+
+    if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CheckHitchance(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,2048) == 0 then
+        if Aimbot_Enforce_Hitbox:Get() then
+            cmd.viewangles.pitch = LatestTargetAngle.x
+            cmd.viewangles.yaw = LatestTargetAngle.y
+        end
         cmd.buttons = bit.bor(cmd.buttons,1)
     end
 
+    
     -- EngineClient.SetViewAngles(QAngle.new(cmd.viewangles.pitch,cmd.viewangles.yaw,0.0))
     -- if LatestAngle.y ~= LatestAngle.y then
     --     print("ADWOIJNIIIIIININININININININININININNAODINAWIODNAW")
@@ -1956,6 +2101,7 @@ end
 -- end)
 
 --local iteration = 0
+PrecomputeSeed()
 local LastMapName = nil
 -- local ShouldStop = false
 
@@ -1978,13 +2124,52 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
         return
     end
 
-    if (GlobalVars.tickcount % (tickrate * 0.5) == 0 and m_iPlayerC4 == player:EntIndex()) then
-        if(active_weapon:GetClassId() == 34)then
-            EngineClient.ExecuteClientCmd("drop")
+    local slot_string = nil
+    local weapon_level = 0
+    if GlobalVars.tickcount % tickrate == 0 then 
+        if (m_iPlayerC4 == player:EntIndex()) then
+            if(active_weapon:GetClassId() == 34)then
+                EngineClient.ExecuteClientCmd("drop")
+            else
+                EngineClient.ExecuteClientCmd("slot5")
+            end
         else
-            EngineClient.ExecuteClientCmd("slot5")
+            if AutoWeaponSwitch_Switch:Get() then 
+                local weapon_list = player:GetProp("m_hMyWeapons")
+                for _,handle in ipairs(weapon_list)do
+                    if handle == -1 then 
+                        -- print("Invalid handle")
+                        goto continue 
+                    end
+                    local weapon_entity = EntityList.GetClientEntityFromHandle(handle)
+                    local weapon_index = weapon_entity:EntIndex()
+                    local weapon = EntityList.GetWeapon(weapon_index)
+
+                    if not weapon or not weapon:IsWeapon() then 
+                        goto continue 
+                    end
+                    if weapon:IsRifle() or weapon:IsSniper() and ( weapon_level < 3 ) then
+                        slot_string = "slot1"
+                        weapon_level = 3
+                        -- print("Changing to rifle/sniper")
+                    elseif weapon:IsPistol() and ( weapon_level < 2 ) then
+                        slot_string = "slot2"
+                        weapon_level = 2
+                        -- print("Changing to pistol")
+                    elseif weapon:IsKnife() and ( weapon_level < 1 )then
+                        slot_string = "slot3"
+                        weapon_level = 1
+                        -- print("Changing to knife")
+                    end
+                    ::continue::
+                end
+                if slot_string ~= nil then
+                    EngineClient.ExecuteClientCmd(slot_string)
+                end
+            end
         end
     end
+  
     
 
     if (GlobalVars.tickcount % tickrate == 0) then
@@ -2006,37 +2191,42 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
         return
     end
 
-    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not((GlobalVars.m_bRemoteClient and m_bWarmupPeriod) or m_bFreezePeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
+    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not(GlobalVars.m_bRemoteClient and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
         --print("Iteration : ",iteration)
-        
-        if(#Path == 0) then
-            if(NeedToResetLists)then
-                --print("PATH 0")
-                PrepareToFindAnotherNode()
-                NeedToResetLists = false
+        if not m_bFreezePeriod then 
+            if(#Path == 0) then
+                if(NeedToResetLists)then
+                    --print("PATH 0")
+                    PrepareToFindAnotherNode()
+                    NeedToResetLists = false
+                else
+                    FindPath()
+                    cmd.forwardmove = 0.0
+                    cmd.sidemove = 0.0
+                    cmd.upmove = 0.0
+                end
             else
-                FindPath()
-                cmd.forwardmove = 0.0
-                cmd.sidemove = 0.0
-                cmd.upmove = 0.0
+                --print("ELSE PATH 0")
+                MoveToTarget(cmd)
+                if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
+                    ObstacleAvoid(cmd)
+                end
+                CheckIfArrivedAtNode(cmd)
             end
-        else
-            --print("ELSE PATH 0")
-            
-            
-            MoveToTarget(cmd)
-            if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
-                ObstacleAvoid(cmd)
-            end
-            CheckIfArrivedAtNode(cmd)
         end
+        
         if not (bit.band(cmd.buttons,1) ~= 0)then 
             Aimbot(cmd)
         end
-        
     end
     -- FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
     -- print("Clamping")
+
+    -- Prevent IN_ATTACK and IN_ATTACK2 in same tick
+    if ( bit.band(cmd.buttons,2048) ~= 0 ) then
+        cmd.buttons = bit.band(cmd.buttons,-2)
+    end
+
     cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
     cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
 

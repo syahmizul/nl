@@ -241,7 +241,7 @@ function Vector3D:Normalized()
     local res = self:Copy()
     local l = res:Length()
     if ( l ~= 0.0 ) then
-        res = res:DivideSingle(fl)
+        res = res:DivideSingle(l)
     else
         res.x = 0
         res.y = 0

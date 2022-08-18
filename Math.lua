@@ -1,7 +1,9 @@
 local Vector3D = require("nl/Vector")
 local Angle = require("nl/QAngle")
 local Math = {
-    PI = 3.14159265358979323846
+    PI = 3.14159265358979323846,
+    PI_2 = 3.14159265358979323846 * 2.0,
+    SMALL_NUM = -2147483648
  }
 Math.__index = Math
 
@@ -196,6 +198,88 @@ function Math:SmoothAngle( from , to , percent )
 
 
 	return DeltaLast 
+end
+
+function Math:dist_Segment_to_Segment(s1, s2, k1, k2)
+    local   u = s2 - s1;
+    local    v = k2 - k1;
+    local   w = s1 - k1;
+    local    a = u:Dot(u)
+    local    b = u:Dot(v)
+    local    c = v:Dot(v)
+    local    d = u:Dot(w)
+    local    e = v:Dot(w)
+    local    D = a*c - b*b;  
+    local    sc, sN
+    local   sD = D       
+    local   tc, tN
+    local   tD = D
+
+    if (D < Math.SMALL_NUM) then
+        sN = 0.0;        
+        sD = 1.0;        
+        tN = e;
+        tD = c;
+    else                 
+        sN = (b*e - c*d);
+        tN = (a*e - b*d);
+        if (sN < 0.0) then      
+            sN = 0.0;
+            tN = e;
+            tD = c;
+        elseif (sN > sD) then
+            sN = sD;
+            tN = e + b;
+            tD = c;
+        end
+    end
+
+    if (tN < 0.0) then     
+        tN = 0.0;
+
+        if (-d < 0.0) then
+            sN = 0.0;
+        elseif (-d > a) then
+            sN = sD;
+        else 
+            sN = -d;
+            sD = a;
+        end
+    elseif (tN > tD) then
+        tN = tD;
+
+        if ((-d + b) < 0.0) then
+            sN = 0;
+        elseif ((-d + b) > a) then
+            sN = sD;
+        else 
+            sN = (-d + b);
+            sD = a;
+        end
+    end
+
+    if ( math.abs(sN) < Math.SMALL_NUM )then 
+        sc = 0.0
+    else
+        sc = sN / sD
+    end
+
+    if ( math.abs(tN) < Math.SMALL_NUM )then 
+        tc = 0.0
+    else
+        tc = tN / tD
+    end
+
+    local dP = w + (u:MultiplySingle(sc)) - (v:MultiplySingle(tc));
+
+    return dP:Length()   
+end
+
+function Math:DoesIntersectCapsule(eyePos, myDir, capsuleA, capsuleB, radius)
+    local endPos = eyePos + (myDir:MultiplySingle(8192.0));
+    local dist = Math:dist_Segment_to_Segment(eyePos, endPos, capsuleA, capsuleB)
+    
+    return dist < radius;
 end
 
 return Math
