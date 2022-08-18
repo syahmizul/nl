@@ -120,6 +120,7 @@ ffi.cdef[[
 	bool		ReadFile        (uint32_t,char *,uint32_t,uint32_t*,uint32_t);
 	uint32_t    SetFilePointer  (uint32_t,int32_t,uint32_t,uint32_t);
 	uint32_t    GetLastError    ();
+    uint32_t    GetFileAttributesA(const char* lpFileName);
 ]]
 
 ffi.cdef[[
@@ -1057,7 +1058,7 @@ local function LoadMap(MapName)
 
     local fileHandle = ffi.C.CreateFileA(MapConcattedWithDirectory,0x10000000,0x1,0,4,0x80,0)
 
-    if (ffi.C.GetLastError() ~= 183 ) then
+    if (ffi.C.GetFileAttributesA(MapConcattedWithDirectory) == 0xFFFFFFFF ) then
         print(".nav file for this map doesn't exist.")
         ffi.C.CloseHandle(fileHandle)
         INavFile.m_isLoaded = false
