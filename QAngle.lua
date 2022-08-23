@@ -3,12 +3,12 @@ local Angle = {
 }
 Angle.__index = Angle
 
-function Angle:new()
+function Angle:new(x,y,z)
     local Object = {}
     setmetatable(Object,self)
-    Object.x = 0.00
-    Object.y = 0.00
-    Object.z = 0.00
+    Object.x = x or 0.00
+    Object.y = y or 0.00 
+    Object.z = z or 0.00
     return Object
 end
 

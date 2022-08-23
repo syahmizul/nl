@@ -307,12 +307,12 @@ local Angle = {
 }
 Angle.__index = Angle
 
-function Angle:new()
+function Angle:new(x,y,z)
     local Object = {}
     setmetatable(Object,self)
-    Object.x = 0.00
-    Object.y = 0.00
-    Object.z = 0.00
+    Object.x = x or 0.00
+    Object.y = y or 0.00 
+    Object.z = z or 0.00
     return Object
 end
 
@@ -759,21 +759,33 @@ function Math:IsInBounds(PointToCheck, first_point, second_point)
     return false
 end
 
-function Math:SmoothAngle( from , to , percent )
+function Math:SmoothAngle( from , to , percent ,smoothmethod,shouldRandomize)
 
     percent = percent or 25
+
+    if shouldRandomize then 
+        percent = math.random(percent)
+        -- print(percent)
+    end
 
     from:NormalizeTo180()
     to:NormalizeTo180()
 	local VecDelta = from - to
 
-
-    VecDelta:NormalizeTo180()
     
-	VecDelta.x = VecDelta.x * ( percent / 100.0 )
-	VecDelta.y = VecDelta.y * ( percent / 100.0 )
-
-
+    VecDelta:NormalizeTo180()
+    -- VecDelta:PrintValueClean()
+    -- print(math.abs(VecDelta.x))
+    -- print(math.abs(VecDelta.y))
+    if smoothmethod == 1 then
+        VecDelta.x = VecDelta.x * ( percent / 100.0 )
+	    VecDelta.y = VecDelta.y * ( percent / 100.0 )
+    else
+        VecDelta.x = Math:Clamp(VecDelta.x,-(percent),(percent))
+	    VecDelta.y = Math:Clamp(VecDelta.y,-(percent),(percent))
+    end
+	
+    
     VecDelta:NormalizeTo180()
 
 
@@ -1100,30 +1112,150 @@ function FileBuffer:Read(SizeToRead)
     return TempVariable
 end
 
-Menu.Text("Walkbot","The settings below are advanced and it's optional to change them.")
-local IterationPerTick_Slider = Menu.SliderInt("Walkbot","Path finding iteration per ticks",1,1,1000,"Increasing this will make the path finding faster,at the cost of your FPS.")
-local Difference2DLimit = Menu.SliderFloat("Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
-local Z_Limit = Menu.SliderFloat("Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
-local ThresholdTime = Menu.SliderInt("Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
-local ThresholdTimeReset = Menu.SliderInt("Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
-local TimeToMove = Menu.SliderFloat("Walkbot", "Enemy Last Seen Threshold", 1.00, 0.01, 10.00, "After this amount of time since the last time we saw an enemy,we will resume moving again.")
+Menu.Text("Walkbot","Walkbot","The settings below are advanced and it's optional to change them.")
+local IterationPerTick_Slider = Menu.SliderInt("Walkbot","Walkbot","Path finding iteration per ticks",1,1,1000,"Increasing this will make the path finding faster,at the cost of your FPS.")
+local Difference2DLimit = Menu.SliderFloat("Walkbot","Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
+local Z_Limit = Menu.SliderFloat("Walkbot","Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
+local ThresholdTime = Menu.SliderInt("Walkbot","Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
+local ThresholdTimeReset = Menu.SliderInt("Walkbot","Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
+local TimeToMove = Menu.SliderFloat("Walkbot","Walkbot", "Enemy Last Seen Threshold", 1.0, 0.0, 60.0, "How long you should stay slow walking / scoped / crouching since the last time you saw an enemy.")
+local Target_Dormant = Menu.Switch("Walkbot","Walkbot","Target Dormant Player",true,"Buggy : Might get stuck sometimes.")
 
-local Aimbot_Enable = Menu.Switch("Aimbot","Enable",false,"Global switch for the aimbot.")
-local Aimbot_SilentAim = Menu.Switch("Aimbot","Silent Aim",false,"Prevents the aiming angles from applying to your engine angles.")
-local BodyAim_Switch = Menu.Switch("Aimbot","Prefer body aim",true,"Prioritizes aiming for the body.If not possible,aim for the head.")
-local Aimbot_Speed = Menu.SliderInt("Aimbot","Speed",10,1,100,"Controls the speed of the aimbot.")
-local Aimbot_Hitchance = Menu.SliderInt("Aimbot","Hitchance",50,1,100,"Enforces more accuracy to the aimbot's shots.")
-local Aimbot_Enforce_Hitbox = Menu.Switch("Aimbot","Force Shoot Center Hitbox",false,"By default,the aimbot will shoot with whatever angle it is at.With this enabled,the aimbot will forcefully shoot the center of the hitbox,making the shot more accurate.This might make your aimbot look more obvious.")
+local Aimbot_Enable = Menu.Switch("Aimbot","Aimbot","Enable",false,"Global switch for the aimbot.")
+local Aimbot_SilentAim = Menu.Switch("Aimbot","Aimbot","Silent Aim",false,"Prevents the aiming angles from applying to your engine angles.")
+local BodyAim_Switch = Menu.Switch("Aimbot","Aimbot","Prefer body aim",true,"Prioritizes aiming for the body.If not possible,aim for the head.")
+local Aimbot_Speed = Menu.SliderInt("Aimbot","Aimbot","Speed",20,1,100,"Controls the speed of the aimbot.")
+local Aimbot_Randomize_Speed = Menu.Switch("Aimbot","Aimbot","Randomize Speed",false,"Will randomize the speed with the above value as the limit.")
+local Aimbot_Smoothing_Method = Menu.Combo("Aimbot","Aimbot", "Smoothing Method", {"Constant","Linear"}, 1, "Linear means the aimbot will have varying speeds.It will try to turn faster if the angle to target is bigger.Looks more obvious.Constant means it will turn at a constant speed regardless of how far the target angle is.Looks more robotic and slower but is more consistent.")
+local Aimbot_Hitchance = Menu.SliderInt("Aimbot","Aimbot","Hitchance",50,1,100,"Enforces more accuracy to the aimbot's shots.")
+local Aimbot_Hitchance_Method = Menu.Combo("Aimbot","Aimbot","Hitchance Trace Method", {"Uniform Trace","Precalculated Random Trace","Runtime Random Seed Trace"}, 0, "Uniform Trace uses a uniform distribution of traces,it's not random and has a consistent pattern.Precalculated Trace uses random angles that are pre-calculated at script startup.Runtime Random Seed Trace uses UserCmd's random seed for generating the randomness.")
+local Aimbot_Enforce_Hitbox = Menu.Switch("Aimbot","Aimbot","Force Shoot Center Hitbox",false,"By default,the aimbot will shoot with whatever angle it is at.With this enabled,the aimbot will forcefully shoot the center of the hitbox,making the shot more accurate.This might make your aimbot look more obvious.")
+local Aimbot_AutoScope_Switch = Menu.Switch("Aimbot","Aimbot","Auto Scope",true,"")
+local Aimbot_AutoUnscope_Switch = Menu.Switch("Aimbot","Aimbot","Auto Unscope",true,"")
+local Aimbot_AutoCrouch_Switch = Menu.Switch("Aimbot","Aimbot","Auto Crouch",false,"Buggy : Fails in some situation.Mostly fails in situations where crouching will make the enemy non visible which will result in an instant uncrouch and then it will loop between crouching and uncrouching causing you to \"jitter crouch\" ")
+local Aimbot_AutoReload_Switch = Menu.Switch("Aimbot","Aimbot","Auto Reload",true,"")
+local Aimbot_AutoReload = Menu.SliderInt("Aimbot","Aimbot","Auto Reload Threshold",25,1,100,"If your active weapon's ammo goes below this amount in percentage,it will automatically reload your weapon.")
 
-local Aimbot_AutoReload_Switch = Menu.Switch("Aimbot","Enable Auto Reload",true,"")
-local Aimbot_AutoReload = Menu.SliderInt("Aimbot","Auto Reload Threshold",25,1,100,"If your active weapon's ammo goes below this amount in percentage,it will automatically reload your weapon.")
-
-local AutoQueue_Switch = Menu.Switch("Misc", "Auto queue", true, "Automatically queues for you.")
-local AutoReconnect_Switch = Menu.Switch("Misc", "Auto reconnect", true, "Automatically reconnects to an ongoing match.")
-local AutoDisconnect_Switch = Menu.Switch("Misc", "Auto disconnect", true, "Automatically disconnects upon match end.")
-local AutoWeaponSwitch_Switch = Menu.Switch("Misc", "Auto switch to best weapon", true, "Automatically switches to the best weapon in your weapon slots.")
+local AutoQueue_Switch = Menu.Switch("Misc","Misc", "Auto queue", true, "Automatically queues for you.")
+local AutoReconnect_Switch = Menu.Switch("Misc","Misc", "Auto reconnect", true, "Automatically reconnects to an ongoing match.")
+local AutoDisconnect_Switch = Menu.Switch("Misc","Misc", "Auto disconnect", true, "Automatically disconnects upon match end.")
+local AutoWeaponSwitch_Switch = Menu.Switch("Misc","Misc", "Auto switch to best weapon", true, "Automatically switches to the best weapon in your weapon slots.")
 
 local Precomputed_Seeds = {}
+
+
+
+local primaryWeapons = {
+    { "None", nil, nil };
+    { "AutoSniper", "scar20" };
+    { "Scout", "ssg08" };
+    { "AWP", "awp" };
+    { "M249", "m249" };
+    { "AUG | SG553", "aug" };
+    { "AK  |  M4", "m4a1" };
+    { "Famas  |  Galil", "galilar" };
+    { "P90", "p90" };
+    { "UMP-45", "ump45" };
+    { "XM1014", "xm1014"};
+    { "Bizon", "bizon"};
+    { "Mag7/Sawed-Off", "mag7"};
+    { "Negev", "negev"};
+    { "MP7/MP5", "mp7"};
+    { "MP9/Mac-10", "mp9"};
+    { "Nova", "nova"};
+};
+local secondaryWeapons = {
+    { "None", nil, nil };
+    { "Dual Elites", "elite" };
+    { "Desert Eagle | R8 Revolver", "deagle" };
+    { "Five Seven | Tec 9", "tec9" };
+    { "P250", "p250" };
+};
+local armors = {
+    { "None", nil, nil };
+    { "Kevlar Vest", "vest", nil };
+    { "Kevlar Vest + Helmet", "vest", "vesthelm" };
+};
+local granades = {
+    { "Off", nil, nil };
+    { "Grenade", "hegrenade", nil };
+    { "Flashbang", "flashbang", nil };
+    { "Smoke Grenade", "smokegrenade", nil };
+    { "Decoy Grenade", "decoy", nil };
+    { "Molotov | Incindiary Grenade", "molotov", "incgrenade" };
+};
+
+
+local AutoBuy_Switch = Menu.Switch("Auto Buy","Auto Buy","Enable",false,"")
+local AutoBuy_Print_Logs = Menu.Switch("Auto Buy","Auto Buy", "Print Logs", false,"")
+local AutoBuy_PrimaryWeapon = Menu.Combo("Auto Buy","Auto Buy", "Primary Weapon", {primaryWeapons[1][1], primaryWeapons[2][1], primaryWeapons[3][1], primaryWeapons[4][1], primaryWeapons[5][1], primaryWeapons[6][1],primaryWeapons[7][1],primaryWeapons[8][1],primaryWeapons[9][1],primaryWeapons[10][1],primaryWeapons[11][1],primaryWeapons[12][1],primaryWeapons[13][1],primaryWeapons[14][1],primaryWeapons[15][1],primaryWeapons[16][1],primaryWeapons[17][1]}, 0, "")
+local AutoBuy_SecondaryWeapon = Menu.Combo("Auto Buy","Auto Buy", "Secondary Weapon", {secondaryWeapons[1][1], secondaryWeapons[2][1], secondaryWeapons[3][1], secondaryWeapons[4][1]}, 0, "")
+local AutoBuy_Armor = Menu.Combo("Auto Buy","Auto Buy", "Armor", {armors[1][1], armors[2][1], armors[3][1]}, 0, "")
+local AutoBuy_Grenade_Slot1 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #1", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+local AutoBuy_Grenade_Slot2 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #2", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+local AutoBuy_Grenade_Slot3 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #3", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+local AutoBuy_Grenade_Slot4 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #4", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+local AutoBuy_Taser_Switch = Menu.Switch("Auto Buy","Auto Buy","Buy Taser",false,"")
+local AutoBuy_Defuser_Switch = Menu.Switch("Auto Buy","Auto Buy","Buy Defuser",false,"")
+
+local function buy(wat)
+    if (wat == nil) then return end
+    if (AutoBuy_Print_Logs:Get()) then
+        print('Bought x1 ' .. wat)
+    end
+    EngineClient.ExecuteClientCmd('buy ' .. '\"' .. wat .. '\"' ..  ';')
+end
+
+local function buyTable(table)
+    for i, j in pairs(table) do
+        buy(j)
+    end
+end
+
+local function buyWeapon(selection, table)
+    local selection = selection:Get()
+    local weaponToBuy = table[selection + 1][2]
+    buy(weaponToBuy)
+end
+
+local function buyGrenades(selections)
+    for k, selection in pairs(selections) do
+        local selection = selection:Get()
+        local grenadeTable = granades[selection + 1]
+        buyTable({ grenadeTable[2], grenadeTable[3] })
+    end
+end
+
+
+local buttons = {
+    IN_ATTACK = 1,
+    IN_JUMP = 2,
+    IN_DUCK = 4,
+    IN_FORWARD = 8,
+    IN_BACK = 16,
+    IN_USE = 32,
+    IN_CANCEL = 64,
+    IN_LEFT = 128,
+    IN_RIGHT = 256,
+    IN_MOVELEFT = 512,
+    IN_MOVERIGHT = 1024,
+    IN_ATTACK2 = 2048,
+    IN_RUN = 4096,
+    IN_RELOAD = 8192,
+    IN_ALT1 = 16384,
+    IN_ALT2 = 32768,
+    IN_SCORE = 65536,
+    IN_SPEED = 131072,
+    IN_WALK = 262144,
+    IN_ZOOM = 524288,
+    IN_WEAPON1 = 1048576,
+    IN_WEAPON2 = 2097152,
+    IN_BULLRUSH = 4194304,
+    IN_GRENADE1 = 8388608,
+    IN_GRENADE2 = 16777216,
+    IN_LOOKSPIN = 33554432
+
+}
 
 local e_hitboxes = {
     HEAD	        = 0,
@@ -1900,7 +2032,7 @@ end
 local function FindNearestAreaToPlayer(AreaList,player)
 
     local player_position = Vector3D:new()
-    player_position:CopyOther(player:GetRenderOrigin())
+    player_position:CopyOther(player:GetEyePosition())
 
     local Latest_Distance = math.huge
     local Nearest_Area = nil
@@ -1991,16 +2123,16 @@ local function FindNearestPlayer(FromPlayer)
     local NearestDistance = math.huge
     local NearestPlayer = nil
 
-    local FromPlayerRenderOrigin = FromPlayer:GetRenderOrigin()
+    local FromPlayerRenderOrigin = FromPlayer:GetEyePosition()
     local FromPlayerPos = Vector3D:new(FromPlayerRenderOrigin.x,FromPlayerRenderOrigin.y,FromPlayerRenderOrigin.z)
 
     for _,Player in ipairs(PlayerList) do
         if Player ~= FromPlayer and Player:IsPlayer() then
             local BasePlayer = Player:GetPlayer()
             local NetworkState = BasePlayer:GetNetworkState() 
-            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and BasePlayer:EntIndex() ~= LastFoundPlayer and (NetworkState == 1 or NetworkState == 0) then
+            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and BasePlayer:EntIndex() ~= LastFoundPlayer and ((NetworkState == 1 and Target_Dormant:Get())or NetworkState == 0) and BasePlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
 
-                local PlayerOrigin = BasePlayer:GetRenderOrigin()
+                local PlayerOrigin = BasePlayer:GetEyePosition()
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
                 local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
@@ -2020,7 +2152,7 @@ local function FindNearestPlayer(FromPlayer)
             local BasePlayer_LastFoundPlayer = EntityList.GetPlayer(LastFoundPlayer)
             if BasePlayer_LastFoundPlayer then 
                 local NetworkState = BasePlayer_LastFoundPlayer:GetNetworkState()
-                if BasePlayer_LastFoundPlayer:IsPlayer() and BasePlayer_LastFoundPlayer:IsAlive() and not BasePlayer_LastFoundPlayer:IsTeamMate() and (NetworkState == 1 or NetworkState == 0) then
+                if BasePlayer_LastFoundPlayer:IsPlayer() and BasePlayer_LastFoundPlayer:IsAlive() and not BasePlayer_LastFoundPlayer:IsTeamMate() and ((NetworkState == 1 and Target_Dormant:Get()) or NetworkState == 0) and BasePlayer_LastFoundPlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
                     NearestPlayer = BasePlayer_LastFoundPlayer
                 end
             end
@@ -2078,9 +2210,9 @@ local function Aimbot__FindNearestPlayer(FromPlayer)
             local BasePlayer = Player:GetPlayer()
             local TempHitboxChoice = IsVisible(FromPlayer,BasePlayer)
             
-            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and TempHitboxChoice > -1 then
+            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and TempHitboxChoice > -1 and BasePlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
 
-                local PlayerOrigin = BasePlayer:GetProp("m_vecOrigin")
+                local PlayerOrigin = BasePlayer:GetEyePosition()
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
                 local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
@@ -2104,14 +2236,17 @@ local Path = {}
 
 local NodeToSkip = {}
 local PlayersToSkip = {}
-local function PrepareToFindAnotherNode()
 
-    math.randomseed(GlobalVars.tickcount)
-
+local function TriggerPrepareToFindAnotherNode()
     OpenList = { }
     ClosedList = { }
     CurrentNode = nil
     Path = { }
+end
+
+local function PrepareToFindAnotherNode()
+
+    math.randomseed(GlobalVars.tickcount)
 
     local local_player = EntityList.GetLocalPlayer()
 
@@ -2153,7 +2288,7 @@ local function PrepareToFindAnotherNode()
     PlayersToSkip = {}
 end
 
-local NeedToResetLists = true
+-- local NeedToResetLists = true
 
 --local StartTime = GlobalVars.realtime
 local function FindPath()
@@ -2164,11 +2299,7 @@ local function FindPath()
         CurrentNode = FindLowestScoreInList(OpenList)
 
         if(CurrentNode == nil) then
-            OpenList = { }
-            ClosedList = { }
-            CurrentNode = nil
-            Path = { }
-            NeedToResetLists = true
+            TriggerPrepareToFindAnotherNode()
 
             CurrentIteration = IterationsAllowed
             break
@@ -2248,7 +2379,7 @@ local function CheckIfArrivedAtNode(cmd)
             --print("arrived at path")
             table.remove(Path,#Path)
             if(#Path == 0) then
-                NeedToResetLists = true
+                TriggerPrepareToFindAnotherNode()
             end
         end
     end
@@ -2288,7 +2419,7 @@ local jumped_last_tick = false
 local should_fake_jump = false
 local function Bhop(cmd)
 
-    cmd.buttons = bit.bor(cmd.buttons,2)
+    cmd.buttons = bit.bor(cmd.buttons,buttons.IN_JUMP)
     return
 
     -- local local_player = EntityList.GetLocalPlayer()
@@ -2383,15 +2514,15 @@ local function ObstacleAvoid(cmd)
             end
 
             if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_CROUCH) ~= 0) then
-                cmd.buttons = bit.bor(cmd.buttons,4) -- Crouch
+                cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK) -- Crouch
             end
         elseif ( CycleAttempt == 2 ) then -- Jump and crouch
             Bhop(cmd)
-            cmd.buttons = bit.bor(cmd.buttons,4)
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK)
         elseif ( CycleAttempt == 3 ) then -- Just jump
             Bhop(cmd)
         elseif ( CycleAttempt == 4 ) then -- Just crouch
-            cmd.buttons = bit.bor(cmd.buttons,4)
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK)
         elseif ( CycleAttempt == 5 ) then -- IN_USE what's in front of us
             local LocalEyePos = local_player:GetEyePosition()
             local LocalEyePosCustom = Vector3D:new()
@@ -2414,7 +2545,7 @@ local function ObstacleAvoid(cmd)
             cmd.viewangles.pitch = AngleToVectorUse.x
             cmd.viewangles.yaw = AngleToVectorUse.y
 
-            cmd.buttons = bit.bor(cmd.buttons,32)
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
 
             
             
@@ -2446,14 +2577,16 @@ local function ObstacleAvoid(cmd)
             cmd.viewangles.pitch = AngleToVectorUse.x
             cmd.viewangles.yaw = AngleToVectorUse.y
 
-            cmd.buttons = bit.bor(cmd.buttons,1)
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
 
         elseif ( CycleAttempt == 7) then
             -- do nothing
         elseif ( CycleAttempt == 8) then -- Find another end area and new starting node
-            Path = {}
+            local PathReference = Path -- save old path before clearing
+            TriggerPrepareToFindAnotherNode()
+            ClosedList = PathReference -- prevent from using old path
+            -- table.insert(ClosedList,NodeToMoveTo)
             CycleAttempt = 0 -- when path is found and CycleAttempt is still 8,it will attempt to find another end area,causing an infinite loop of finding paths and generating new end area.
-            NeedToResetLists = true
         end
     else
         if( bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then
@@ -2461,7 +2594,7 @@ local function ObstacleAvoid(cmd)
         end
 
         if( bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_CROUCH) ~= 0) then
-            cmd.buttons = bit.bor(cmd.buttons,4) -- Crouch
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK) -- Crouch
         end
     end
 end
@@ -2506,22 +2639,8 @@ local function MoveToTarget(cmd)
 
     Math:AngleVectors(AngleToNode,forward)
     -- print(TimeSinceLastSeenEnemy)
-    if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
-        forward = forward:MultiplySingle(450)
-        if local_player:GetProp("m_bIsScoped") then
-            cmd.buttons = bit.bor(cmd.buttons,2048)
-        end
-    else
-        if local_weapon and not local_weapon:IsReloading() then
-            -- print("Stopping to max weapon speed")
-            local weapon_max_speed = local_weapon:GetMaxSpeed()
-            local weapon_speed_max_accuracy = weapon_max_speed * 0.25
-            forward = forward:MultiplySingle(weapon_speed_max_accuracy)
-        else
-            forward = forward:MultiplySingle(450)
-        end
-    end
     
+    forward = forward:MultiplySingle(450)
 
 
     cmd.forwardmove = forward.x
@@ -2549,15 +2668,27 @@ local function PrecomputeSeed()
 	
 end
 
-local function CalculateSpread(weapon,seed,inaccuracy,spread)
+local function CalculateSpread(weapon,seed,inaccuracy,spread,UsePrecomputedSeeds,cmdSeed)
     if not weapon or weapon:GetProp("m_iClip1") == 0 then
         return Vector3D:new()
     end
 
-    local r1 = Precomputed_Seeds[seed][1]
-	local r2 = Precomputed_Seeds[seed][2]
-	local r3 = Precomputed_Seeds[seed][3]
-	local r4 = Precomputed_Seeds[seed][4]
+    local r1,r2,r3,r4
+
+    if UsePrecomputedSeeds then
+        r1 = Precomputed_Seeds[seed][1]
+        r2 = Precomputed_Seeds[seed][2]
+        r3 = Precomputed_Seeds[seed][3]
+        r4 = Precomputed_Seeds[seed][4]
+    else
+        Utils.RandomSeed(bit.band(cmdSeed,0xff) + 1)
+	
+        r1 = Utils.RandomFloat(0.0,1.0)
+        r2 = Utils.RandomFloat(0.0,Math.PI_2)
+        r3 = Utils.RandomFloat(0.0,1.0)
+        r4 = Utils.RandomFloat(0.0,Math.PI_2)
+    end
+    
 
 	local c1 = math.cos(r2)
 	local c2 = math.cos(r4)
@@ -2572,7 +2703,7 @@ local function CalculateSpread(weapon,seed,inaccuracy,spread)
     
 end
 
-local function CheckHitchance(angleToTarget,entity)
+local function CheckHitchancePrecomputed(angleToTarget,entity)
     local local_player  = EntityList.GetLocalPlayer()
     local weapon        = local_player:GetActiveWeapon() 
 
@@ -2591,7 +2722,7 @@ local function CheckHitchance(angleToTarget,entity)
     local total_hits        = 0
 
     for i = 1,255 do
-        local wep_spread = CalculateSpread(weapon,i,inaccuracy,spread)
+        local wep_spread = CalculateSpread(weapon,i,inaccuracy,spread,true,nil)
 
         local dir = Vector3D:new(
             forward.x + (right.x * wep_spread.x) + (up.x * wep_spread.y),
@@ -2620,6 +2751,98 @@ local function CheckHitchance(angleToTarget,entity)
     return false
 end
 
+local function CheckHitchanceRandom(cmd,angleToTarget,entity)
+    local local_player  = EntityList.GetLocalPlayer()
+    local weapon        = local_player:GetActiveWeapon() 
+
+    local lp_eyepos     = local_player:GetEyePosition()
+    
+    local forward             = Vector3D:new()
+    local right                 = Vector3D:new()
+    local up                    = Vector3D:new()
+
+    Math:AngleVectorsExtra(angleToTarget,forward,right,up)
+
+    local spread            = weapon:GetSpread(weapon)
+    local inaccuracy    = weapon:GetInaccuracy(weapon)  
+
+    local needed_hits   =  math.ceil((Aimbot_Hitchance:Get() / 100) * 255)
+    local total_hits        = 0
+
+    for i = 1,255 do
+        local wep_spread = CalculateSpread(weapon,i,inaccuracy,spread,false,cmd.random_seed)
+
+        local dir = Vector3D:new(
+            forward.x + (right.x * wep_spread.x) + (up.x * wep_spread.y),
+            forward.y + (right.y * wep_spread.x) + (up.y * wep_spread.y),
+            forward.z + (right.z * wep_spread.x) + (up.z * wep_spread.y)
+        )
+
+        local EndVec = Vector3D:new(
+            lp_eyepos.x + (dir.x * 8192.0),
+            lp_eyepos.y + (dir.y * 8192.0),
+            lp_eyepos.z + (dir.z * 8192.0)
+        )
+
+        local trace_result = EngineTrace.TraceRay(lp_eyepos, Vector.new(EndVec.x, EndVec.y, EndVec.z), local_player, 0x46004003)
+
+        if (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == entity:EntIndex()) then
+            total_hits = total_hits + 1
+        end
+
+        if (total_hits >= needed_hits) then
+            return true
+        end
+
+
+    end
+    return false
+end
+
+
+local function CheckHitchanceUniform (angle,entity)
+  
+    local local_player = EntityList.GetLocalPlayer()
+    local weapon        = local_player:GetActiveWeapon() 
+
+    -- local viewAngles = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
+    local start         = Vector3D:new()
+    start:CopyOther(local_player:GetEyePosition())
+
+    local spread            =   weapon:GetSpread(weapon)
+    local inaccuracy        =   weapon:GetInaccuracy(weapon)  
+
+    local spreadAngle       = math.deg(spread + inaccuracy)
+
+
+    local needed_hits       =  math.ceil((Aimbot_Hitchance:Get() / 100) * 255)
+    local total_hits        = 0
+
+    for i = 1,255 do
+    
+        local ratio         = (i / 255)
+        local multiplier    = ratio * spreadAngle
+        local spreadDir     = math.sqrt(ratio) * Math.PI * 30
+        local spreadAngle   = Angle:new( math.cos(spreadDir) * multiplier, math.sin(spreadDir) * multiplier, 0 )
+        local shotAngle     = angle + spreadAngle
+        local forward       = Vector3D:new()
+        Math:AngleVectors(shotAngle,forward)
+        forward = forward:MultiplySingle(8192.0)
+        local endpos        = (start + forward)
+        local trace_result  = EngineTrace.TraceRay(local_player:GetEyePosition(), Vector.new(endpos.x, endpos.y, endpos.z), local_player, 0x46004003)
+
+        if (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == entity:EntIndex()) then
+            total_hits = total_hits + 1
+        end
+
+        if (total_hits >= needed_hits) then
+            return true
+        end
+    end
+
+    -- print(total_hits)
+    return false
+end
 local function CanLocalPlayerShoot()
     local local_player = EntityList.GetLocalPlayer()
     local local_weapon = local_player:GetActiveWeapon()
@@ -2647,7 +2870,7 @@ local function CanLocalPlayerShoot()
     return (weapon__m_flNextPrimaryAttack <= flServerTime)
 end
 
-local function CanHit_Angle(StartPos,CurrentAngle,PlayerSkip)
+local function CanHit_Angle(StartPos,CurrentAngle,PlayerSkip,TargetEntity)
 
     local VectorFromAngle = Vector3D:new()
     Math:AngleVectors(CurrentAngle,VectorFromAngle)
@@ -2657,9 +2880,11 @@ local function CanHit_Angle(StartPos,CurrentAngle,PlayerSkip)
     local VectorFromAngle_Converted = Vector.new(VectorFromAngle.x,VectorFromAngle.y,VectorFromAngle.z)
     local trace_result = EngineTrace.TraceRay(StartPos, VectorFromAngle_Converted, PlayerSkip, 0x46004003)
 
-    return (trace_result.hit_entity and trace_result.hit_entity:IsPlayer() and not trace_result.hit_entity:GetPlayer():IsTeamMate())
+    return (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == TargetEntity:EntIndex())
 
 end
+
+
 
 local function BeMoreAccurate(cmd)
 
@@ -2684,22 +2909,48 @@ local function BeMoreAccurate(cmd)
     -- cmd.sidemove = negated_direction.y
 
     local local_player = EntityList.GetLocalPlayer()
+
+    if not local_player then return end
+
     local local_weapon = local_player:GetActiveWeapon()
 
-    if local_weapon and not local_weapon:IsReloading() then
-        -- print("Stopping to max weapon speed")
-        local weapon_max_speed = local_weapon:GetMaxSpeed()
-        local weapon_speed_max_accuracy = weapon_max_speed * 0.25
-        cmd.forwardmove = Math:Clamp(cmd.forwardmove,-(weapon_speed_max_accuracy),weapon_speed_max_accuracy)
-        cmd.sidemove = Math:Clamp(cmd.sidemove,-(weapon_speed_max_accuracy),weapon_speed_max_accuracy)
-    else
-        cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
-        cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
+    if not local_weapon or local_weapon:IsReloading() then return end
+
+    -- print("Stopping to max weapon speed")
+    -- local weapon_max_speed = local_weapon:GetMaxSpeed()
+
+    -- if not weapon_max_speed then return end
+
+    local get_speed = 33
+
+    local min_speed = math.sqrt((cmd.forwardmove * cmd.forwardmove) + (cmd.sidemove * cmd.sidemove) + (cmd.upmove * cmd.upmove))
+
+    if min_speed <= 0.0 then return end
+
+    if Aimbot_AutoCrouch_Switch:Get() then 
+        cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK)
+    end
+    
+    cmd.buttons = bit.band(cmd.buttons,bit.bnot(buttons.IN_JUMP))
+
+    if bit.band(cmd.buttons,buttons.IN_DUCK) ~= 0 then
+        get_speed = get_speed * 2.94117647
     end
 
-    cmd.buttons = bit.band(cmd.buttons,-3)
+    if min_speed <= get_speed then
+        return
+    end
+
+    local kys = get_speed / min_speed
     
-    -- print("stopping")
+
+    cmd.forwardmove = cmd.forwardmove * kys
+    cmd.sidemove = cmd.sidemove * kys
+    cmd.upmove = cmd.upmove * kys
+
+    -- cmd.forwardmove = Math:Clamp(cmd.forwardmove,-(weapon_speed_max_accuracy),weapon_speed_max_accuracy)
+    -- cmd.sidemove = Math:Clamp(cmd.sidemove,-(weapon_speed_max_accuracy),weapon_speed_max_accuracy)
+    
 end
 
 local RecoilScale = CVar.FindVar("weapon_recoil_scale")
@@ -2712,13 +2963,10 @@ local LatestAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
 
 local function Aimbot(cmd)
 
-    if not Aimbot_Enable:Get() then 
-        TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
-        return 
-    end
+    if not Aimbot_Enable:Get() then return end
     local tickrate = 1.0 / GlobalVars.interval_per_tick
 
-    TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
+    
     local NodeToMoveTo = Path[#Path]
 
     local local_player = EntityList.GetLocalPlayer()
@@ -2732,7 +2980,7 @@ local function Aimbot(cmd)
         local current_clip_percentage = clip / max_clip
 
         if(current_clip_percentage < ( Aimbot_AutoReload:Get() / 100 ) ) then
-            cmd.buttons = bit.bor(cmd.buttons,8192)
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_RELOAD)
         end
     end
 
@@ -2744,9 +2992,9 @@ local function Aimbot(cmd)
 
     if TargetPlayerAndHitbox[1] ~= nil and TargetPlayerAndHitbox[2] ~= nil and Vector3D:IsValid(local_player_pos) then 
         TimeSinceLastSeenEnemy = 0
-        BeMoreAccurate(cmd)
-        if local_weapon:GetProp("m_zoomLevel") == 0 and local_weapon:IsSniper() and bit.band(cmd.buttons,2048) == 0 then
-            cmd.buttons = bit.bor(cmd.buttons,2048)
+        BeMoreAccurate(cmd) -- When seen enemy,always try to be more accurate
+        if Aimbot_AutoScope_Switch:Get() and local_weapon and local_weapon:GetProp("m_zoomLevel") == 0 and local_weapon:IsSniper() and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
         end
 
         local TargetHitbox = TargetPlayerAndHitbox[1]:GetHitboxCenter(TargetPlayerAndHitbox[2])
@@ -2758,7 +3006,7 @@ local function Aimbot(cmd)
             end
         end
     else
-        if NodeToMoveTo and TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
+        if NodeToMoveTo and TimeSinceLastSeenEnemy > tickrate * TimeToMove:Get() then
             if Vector3D:IsValid(NodeToMoveTo.area.m_center)then
                 local AngleToTarget = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
 
@@ -2773,7 +3021,7 @@ local function Aimbot(cmd)
         -- LatestTargetAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
     end
     
-    LatestAngle = Math:SmoothAngle(LatestAngle,LatestTargetAngle,Aimbot_Speed:Get())
+    LatestAngle = Math:SmoothAngle(LatestAngle,LatestTargetAngle,Aimbot_Speed:Get(),Aimbot_Smoothing_Method:Get(),Aimbot_Randomize_Speed:Get())
     -- LatestAngle:PrintValueClean()
     LatestAngle:NormalizeTo180()
     
@@ -2785,17 +3033,43 @@ local function Aimbot(cmd)
     cmd.viewangles.pitch = LatestAngle.x
     cmd.viewangles.yaw = LatestAngle.y
     
+    local Hitchance_Method = Aimbot_Hitchance_Method:Get()
 
-
-    if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CheckHitchance(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,2048) == 0 then
-        if Aimbot_Enforce_Hitbox:Get() then
-            cmd.viewangles.pitch = LatestTargetAngle.x
-            cmd.viewangles.yaw = LatestTargetAngle.y
+    if Hitchance_Method == 1 then
+        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchancePrecomputed(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            if Aimbot_Enforce_Hitbox:Get() then
+                cmd.viewangles.pitch = LatestTargetAngle.x
+                cmd.viewangles.yaw = LatestTargetAngle.y
+            end
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
         end
-        cmd.buttons = bit.bor(cmd.buttons,1)
+    elseif Hitchance_Method == 2 then
+        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceRandom(cmd,LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            if Aimbot_Enforce_Hitbox:Get() then
+                cmd.viewangles.pitch = LatestTargetAngle.x
+                cmd.viewangles.yaw = LatestTargetAngle.y
+            end
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+        end
+    else
+        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceUniform(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            if Aimbot_Enforce_Hitbox:Get() then
+                cmd.viewangles.pitch = LatestTargetAngle.x
+                cmd.viewangles.yaw = LatestTargetAngle.y
+            end
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+        end
     end
-
     
+
+    if (TimeSinceLastSeenEnemy > tickrate * TimeToMove:Get()) then
+        if Aimbot_AutoUnscope_Switch:Get() and local_weapon and local_weapon:GetProp("m_zoomLevel") ~= 0 and bit.band(cmd.buttons,buttons.IN_ATTACK) == 0 then 
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
+        end
+    else
+        BeMoreAccurate(cmd) -- AFTER seen enemy,we can still be more accurate just in case they peek again in a short time span.
+    end
+     
     -- EngineClient.SetViewAngles(QAngle.new(cmd.viewangles.pitch,cmd.viewangles.yaw,0.0))
     -- if LatestAngle.y ~= LatestAngle.y then
     --     print("ADWOIJNIIIIIININININININININININININNAODINAWIODNAW")
@@ -2866,6 +3140,11 @@ local LastMapName = nil
 -- local ShouldStop = false
 
 Cheat.RegisterCallback("pre_prediction", function(cmd)
+
+    if ( bit.band(cmd.buttons,buttons.IN_ATTACK,buttons.IN_ATTACK2) ~= 0 ) then
+        return
+    end
+
     local tickrate = 1.0 / GlobalVars.interval_per_tick
    --FindPath()
     local game_rules = EntityList.GetGameRules()
@@ -2895,20 +3174,24 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
             end
         else
             if AutoWeaponSwitch_Switch:Get() then 
+                -- print("Auto Weapon Switch Start")
+                -- print(" ")
                 local weapon_list = player:GetProp("m_hMyWeapons")
                 for _,handle in ipairs(weapon_list)do
                     if handle == -1 then 
                         -- print("Invalid handle")
                         goto continue 
                     end
-                    local weapon_entity = EntityList.GetClientEntityFromHandle(handle)
-                    local weapon_index = weapon_entity:EntIndex()
-                    local weapon = EntityList.GetWeapon(weapon_index)
+                    local weapon_entity = EntityList.GetWeaponFromHandle(handle)
+                    
 
-                    if not weapon or not weapon:IsWeapon() then 
+                    if not weapon_entity or not weapon_entity:IsWeapon() then 
                         goto continue 
                     end
-                    if weapon:IsRifle() or weapon:IsSniper() and ( weapon_level < 3 ) then
+                    local weapon = weapon_entity:GetWeapon()
+
+
+                    if (weapon:IsRifle() or weapon:IsSniper()) and ( weapon_level < 3 ) then
                         slot_string = "slot1"
                         weapon_level = 3
                         -- print("Changing to rifle/sniper")
@@ -2921,11 +3204,14 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
                         weapon_level = 1
                         -- print("Changing to knife")
                     end
+                    
                     ::continue::
                 end
                 if slot_string ~= nil then
                     EngineClient.ExecuteClientCmd(slot_string)
                 end
+                -- print("Auto Weapon Switch End")
+                -- print(" ")
             end
         end
     end
@@ -2936,11 +3222,7 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
         if (EngineClient.GetLevelNameShort() ~= LastMapName) then
             print("Map changed.")
             INavFile.m_isLoaded = false
-            OpenList = { }
-            ClosedList = { }
-            CurrentNode = nil
-            Path = { }
-            NeedToResetLists = true
+            TriggerPrepareToFindAnotherNode()
         end
     end
 
@@ -2954,11 +3236,12 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
     if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not(GlobalVars.m_bRemoteClient and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
         --print("Iteration : ",iteration)
         if not m_bFreezePeriod then 
+
+
             if(#Path == 0) then
-                if(NeedToResetLists)then
+                if (#OpenList == 0) then
                     --print("PATH 0")
                     PrepareToFindAnotherNode()
-                    NeedToResetLists = false
                 else
                     FindPath()
                     cmd.forwardmove = 0.0
@@ -2968,23 +3251,26 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
             else
                 --print("ELSE PATH 0")
                 MoveToTarget(cmd)
-                if TimeSinceLastSeenEnemy >= tickrate * TimeToMove:Get() then
+                if TimeSinceLastSeenEnemy > tickrate * TimeToMove:Get() then
                     ObstacleAvoid(cmd)
                 end
                 CheckIfArrivedAtNode(cmd)
             end
         end
         
-        if not (bit.band(cmd.buttons,1) ~= 0)then 
+        if (bit.band(cmd.buttons,buttons.IN_ATTACK) == 0)then 
             Aimbot(cmd)
         end
+        -- print("TimeSinceLastSeenEnemy : ",TimeSinceLastSeenEnemy)
     end
+
+    TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
     -- FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
     -- print("Clamping")
 
     -- Prevent IN_ATTACK and IN_ATTACK2 in same tick
-    if ( bit.band(cmd.buttons,2048) ~= 0 ) then
-        cmd.buttons = bit.band(cmd.buttons,-2)
+    if ( bit.band(cmd.buttons,buttons.IN_ATTACK,buttons.IN_ATTACK2) ~= 0 ) then
+        cmd.buttons = bit.band(cmd.buttons,bit.bnot(buttons.IN_ATTACK)) -- dont shoot,prioritize scoping first
     end
 
     cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
@@ -3185,15 +3471,10 @@ Cheat.RegisterCallback("events", function(event)
         AlreadyAttemptedToReconnect = false
 
         INavFile.m_isLoaded = false
-        OpenList = { }
-        ClosedList = { }
-        CurrentNode = nil
-        Path = { }
-        NeedToResetLists = true
+        TriggerPrepareToFindAnotherNode()
         goto continue
     end
     if (event:GetName() == "player_spawn") then
-        TimeSinceLastSeenEnemy = tickrate * TimeToMove:Get()
         local local_player = EntityList.GetLocalPlayer()
         if local_player == nil then
             return
@@ -3201,11 +3482,23 @@ Cheat.RegisterCallback("events", function(event)
         local player_info = local_player:GetPlayerInfo()
         local UserID = player_info.userId
         if (event:GetInt("userid", -1) == UserID) then
-            OpenList = { }
-            ClosedList = { }
-            CurrentNode = nil
-            Path = { }
-            NeedToResetLists = true
+            TimeSinceLastSeenEnemy = tickrate * TimeToMove:Get()
+            TriggerPrepareToFindAnotherNode()
+            if AutoBuy_Switch:Get() then
+                buyWeapon(AutoBuy_PrimaryWeapon, primaryWeapons)
+                buyWeapon(AutoBuy_SecondaryWeapon, secondaryWeapons)
+                local armorSelected = AutoBuy_Armor:Get()
+                local armorTable = armors[armorSelected + 1]
+                buyTable({ armorTable[2], armorTable[3] })
+                if (AutoBuy_Defuser_Switch:Get()) then
+                    buy('defuser')
+                end
+                if (AutoBuy_Taser_Switch:Get()) then
+                    buy('taser')
+                buyGrenades({ AutoBuy_Grenade_Slot1, AutoBuy_Grenade_Slot2, AutoBuy_Grenade_Slot3, AutoBuy_Grenade_Slot4 })
+                end
+            end
+            
         end
     -- elseif (event:GetName() == "nextlevel_changed")then
     --     print("nextlevel_changed")

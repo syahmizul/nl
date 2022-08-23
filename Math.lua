@@ -174,21 +174,33 @@ function Math:IsInBounds(PointToCheck, first_point, second_point)
     return false
 end
 
-function Math:SmoothAngle( from , to , percent )
+function Math:SmoothAngle( from , to , percent ,smoothmethod,shouldRandomize)
 
     percent = percent or 25
+
+    if shouldRandomize then 
+        percent = math.random(percent)
+        -- print(percent)
+    end
 
     from:NormalizeTo180()
     to:NormalizeTo180()
 	local VecDelta = from - to
 
-
-    VecDelta:NormalizeTo180()
     
-	VecDelta.x = VecDelta.x * ( percent / 100.0 )
-	VecDelta.y = VecDelta.y * ( percent / 100.0 )
-
-
+    VecDelta:NormalizeTo180()
+    -- VecDelta:PrintValueClean()
+    -- print(math.abs(VecDelta.x))
+    -- print(math.abs(VecDelta.y))
+    if smoothmethod == 1 then
+        VecDelta.x = VecDelta.x * ( percent / 100.0 )
+	    VecDelta.y = VecDelta.y * ( percent / 100.0 )
+    else
+        VecDelta.x = Math:Clamp(VecDelta.x,-(percent),(percent))
+	    VecDelta.y = Math:Clamp(VecDelta.y,-(percent),(percent))
+    end
+	
+    
     VecDelta:NormalizeTo180()
 
 
