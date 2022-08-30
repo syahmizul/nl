@@ -610,7 +610,7 @@ local function AutoBuy()
     end
 
     for k,v in ipairs(AutoBuy_Equipment:get()) do
-        for i,j in ipairs(v)do
+        for i,j in ipairs(equipments[v])do
             utils.console_exec("buy " .. "\"" .. j .. "\";" )
         end
     end
@@ -2450,9 +2450,11 @@ local function Aimbot(cmd)
     local TargetPlayerAndHitbox = Aimbot__FindNearestPlayer(local_player)
 
     if TargetPlayerAndHitbox[1] ~= nil and TargetPlayerAndHitbox[2] ~= nil and Vector3D:IsValid(local_player_pos) then 
+        -- print("Has Enemy")
         TimeSinceLastSeenEnemy = 0
         BeMoreAccurate(cmd) -- When seen enemy,always try to be more accurate
-        if Aimbot_AutoScope_Switch:get() and local_weapon and local_weapon.m_zoomLevel == 0 and local_weapon:get_weapon_info().m_WeaponType == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+        local weapon_type_ptr = ffi.cast("int*",GetCSWeaponData(local_weapon,true) + 0xC8)
+        if Aimbot_AutoScope_Switch:get() and weapon_type_ptr and local_weapon and local_weapon.m_zoomLevel == 0 and weapon_type_ptr[0] == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
         end
 
