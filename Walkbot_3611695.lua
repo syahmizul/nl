@@ -90,7 +90,7 @@
     -- return ffi.cast("GetFileTime_FN",GetVirtualFunction(self.address,13))(self.address,pFileName,pPathID or ffi.cast("const char*",0))
 -- end
 
--- local g_FileSystem = IBaseFileSystem:new(ffi.cast("uint32_t",Utils.CreateInterface("filesystem_stdio.dll", "VBaseFileSystem011")))
+-- local g_FileSystem = IBaseFileSystem:new(ffi.cast("uint32_t",utils.create_interface("filesystem_stdio.dll", "VBaseFileSystem011")))
 -- local FileHandle = g_FileSystem:Open("ar_shoots_story.txt", "r", "GAME")
 -- if(tonumber(FileHandle) > 0) then
 
@@ -104,9 +104,11 @@
 -- end
 -- Valve file API above^^
 
-local Vector3D = require("nl/Vector")
-local Angle = require("nl/QAngle")
-local Math = require("nl/Math")
+_DEBUG = true
+
+local Vector3D = require("neverlose/vector3d_silverhawk21")
+local Angle = require("neverlose/qangle_silverhawk21")
+local Math = require("neverlose/math_silverhawk21")
 
 local function GetVirtualFunction(address,index)
     local vtable = ffi.cast("uint32_t**",address)[0]
@@ -228,12 +230,12 @@ local function InitializeRay(Ray,VecStart,VecEnd)
 end
 
 
-local pGetModuleHandle_sig = ffi.cast("uint32_t",Utils.PatternScan("engine.dll", " FF 15 ? ? ? ? 85 C0 74 0B"))
+local pGetModuleHandle_sig = ffi.cast("uint32_t",utils.opcode_scan("engine.dll", " FF 15 ? ? ? ? 85 C0 74 0B"))
 local pGetModuleHandle = ffi.cast("uint32_t**", ffi.cast("uint32_t", pGetModuleHandle_sig) + 2)[0][0]
 local fnGetModuleHandle = ffi.cast("uint32_t(__stdcall*)(const char*)", pGetModuleHandle)
 
 
-local g_EngineTrace = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","EngineTraceClient004"))
+local g_EngineTrace = ffi.cast("uint32_t",utils.create_interface("engine.dll","EngineTraceClient004"))
 local function TraceRay(ray,mask,filter,trace)
     ffi.cast("TraceRay_FN",GetVirtualFunction(g_EngineTrace , 5)) (g_EngineTrace,ray,mask,filter,trace)
 end
@@ -241,13 +243,13 @@ end
 ffi.cdef [[
 	typedef bool (__thiscall* IsBreakableEntity_FN) (uint32_t EntityAddress);
 ]]
-local IsBreakableEntity = ffi.cast("IsBreakableEntity_FN",Utils.PatternScan("client.dll", "55 8B EC 51 56 8B F1 85 F6 74 68 83 BE"))
+local IsBreakableEntity = ffi.cast("IsBreakableEntity_FN",utils.opcode_scan("client.dll", "55 8B EC 51 56 8B F1 85 F6 74 68 83 BE"))
 
 ffi.cdef [[
     typedef uint32_t(__thiscall* GetClientEntity_FN)(uint32_t this,uint32_t entNum);
 ]]
 
-local g_EntityList = ffi.cast("uint32_t",Utils.CreateInterface("client.dll","VClientEntityList003"))
+local g_EntityList = ffi.cast("uint32_t",utils.create_interface("client.dll","VClientEntityList003"))
 local function GetClientEntity(entNum)
     return ffi.cast("GetClientEntity_FN",GetVirtualFunction(g_EntityList , 3))(g_EntityList,entNum)
 end
@@ -258,7 +260,7 @@ ffi.cdef [[
     typedef bool        (__thiscall* IsClientLocalToActiveServer_FN)    (uint32_t this);
     typedef char const* (__thiscall* GetLevelNameShort_FN)              (uint32_t this);
 ]]
-local g_EngineClient = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","VEngineClient014"))
+local g_EngineClient = ffi.cast("uint32_t",utils.create_interface("engine.dll","VEngineClient014"))
 
 local function IsDrawingLoadingImage()
     return ffi.cast("IsDrawingLoadingImage_FN",GetVirtualFunction(g_EngineClient , 28))(g_EngineClient)
@@ -276,7 +278,7 @@ local function IsClientLocalToActiveServer()
     return ffi.cast("IsClientLocalToActiveServer_FN",GetVirtualFunction(g_EngineClient , 197))(g_EngineClient)
 end
 
-local g_GameUI = ffi.cast("uint32_t",Utils.CreateInterface("client.dll","GameUI011"))
+local g_GameUI = ffi.cast("uint32_t",utils.create_interface("client.dll","GameUI011"))
 local g_GameState = ffi.cast("int*",g_GameUI + 0x1E4)
 
 local function GetGameState ()
@@ -290,10 +292,41 @@ local function GetSignOnState()
     return SignOnState
 end
 
-local g_EngineVGUI = ffi.cast("uint32_t",Utils.CreateInterface("engine.dll","VEngineVGui001"))
+local g_EngineVGUI = ffi.cast("uint32_t",utils.create_interface("engine.dll","VEngineVGui001"))
 
 local scr_disabled_for_loading = ffi.cast("bool*",fnGetModuleHandle("engine.dll") + 0x62A115)
 
+ffi.cdef[[
+    typedef uint32_t        (__thiscall* GetWeaponData_FN)          (uint32_t this,uint32_t ItemDefinitionIndex);
+]]
+
+local g_WeaponSystem = ffi.cast("uint32_t*",utils.opcode_scan("client.dll","8B 35 ? ? ? ? FF 10 0F B7 C0",2))[0]
+
+local function GetWeaponData(ItemDefinitionIndex)
+    return ffi.cast("GetWeaponData_FN",GetVirtualFunction(g_WeaponSystem,2))(g_WeaponSystem,ItemDefinitionIndex)
+end
+
+-- use this to get CCSWeaponInfo,current API has issues or I have issues.
+-- get_player_weapon(true) seems to be buggy
+local function GetCSWeaponData(weapon,multiple)
+    -- if multiple then
+    --     local offset = utils.get_netvar_offset("DT_BaseAttributableItem", "m_iItemDefinitionIndex")
+    --     local itemdefinitionindex_ptr = ffi.cast("int*",ffi.cast("uint32_t",weapon) + offset)
+    --     if itemdefinitionindex_ptr and itemdefinitionindex_ptr[0] then
+    --         return GetWeaponData(itemdefinitionindex_ptr[0])
+    --     end
+    -- else
+    --     return GetWeaponData(weapon.m_iItemDefinitionIndex)
+    -- end
+    return GetWeaponData(weapon.m_iItemDefinitionIndex)
+    
+end
+
+local g_GlobalVars = ffi.cast("uint32_t**",utils.opcode_scan("client.dll","A1 ? ? ? ? 5E 8B 40 10",1))[0][0]
+
+local function m_bRemoteClient()
+    return ffi.cast("bool*",g_GlobalVars + 0x32)[0]
+end 
 local function DumpTable(o)
     if type(o) == 'table' then
         local s = '{ '
@@ -340,121 +373,249 @@ function FileBuffer:Read(SizeToRead)
     self.Position = self.Position + SizeToRead
     return TempVariable
 end
+local Walkbot_MenuGroup = ui.create("Walkbot", "Walkbot")
+Walkbot_MenuGroup:label("The settings below are advanced and it's optional to change them.")
+-- Menu.Text("Walkbot","Walkbot","The settings below are advanced and it's optional to change them.")
 
-Menu.Text("Walkbot","Walkbot","The settings below are advanced and it's optional to change them.")
-local IterationPerTick_Slider = Menu.SliderInt("Walkbot","Walkbot","Path finding iteration per ticks",1,1,1000,"Increasing this will make the path finding faster,at the cost of your FPS.")
-local Difference2DLimit = Menu.SliderFloat("Walkbot","Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
-local Z_Limit = Menu.SliderFloat("Walkbot","Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
-local ThresholdTime = Menu.SliderInt("Walkbot","Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
-local ThresholdTimeReset = Menu.SliderInt("Walkbot","Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
-local TimeToMove = Menu.SliderFloat("Walkbot","Walkbot", "Enemy Last Seen Threshold", 1.0, 0.0, 60.0, "How long you should stay slow walking / scoped / crouching since the last time you saw an enemy.")
-local Target_Dormant = Menu.Switch("Walkbot","Walkbot","Target Dormant Player",true,"Buggy : Might get stuck sometimes.")
+-- local IterationPerTick_Slider = Menu.SliderInt("Walkbot","Walkbot","Path finding iteration per ticks",1,1,1000,"Increasing this will make the path finding faster,at the cost of your FPS.")
+local IterationPerTick_Slider = Walkbot_MenuGroup:slider("Path finding iteration per ticks",1,1000,1,1)
+IterationPerTick_Slider:set_tooltip("Increasing this will make the path finding faster,at the cost of your FPS.")
 
-local Aimbot_Enable = Menu.Switch("Aimbot","Aimbot","Enable",false,"Global switch for the aimbot.")
-local Aimbot_SilentAim = Menu.Switch("Aimbot","Aimbot","Silent Aim",false,"Prevents the aiming angles from applying to your engine angles.")
-local BodyAim_Switch = Menu.Switch("Aimbot","Aimbot","Prefer body aim",true,"Prioritizes aiming for the body.If not possible,aim for the head.")
-local Aimbot_Speed = Menu.SliderInt("Aimbot","Aimbot","Speed",20,1,100,"Controls the speed of the aimbot.")
-local Aimbot_Randomize_Speed = Menu.Switch("Aimbot","Aimbot","Randomize Speed",false,"Will randomize the speed with the above value as the limit.")
-local Aimbot_Smoothing_Method = Menu.Combo("Aimbot","Aimbot", "Smoothing Method", {"Constant","Linear"}, 1, "Linear means the aimbot will have varying speeds.It will try to turn faster if the angle to target is bigger.Looks more obvious.Constant means it will turn at a constant speed regardless of how far the target angle is.Looks more robotic and slower but is more consistent.")
-local Aimbot_Hitchance = Menu.SliderInt("Aimbot","Aimbot","Hitchance",50,1,100,"Enforces more accuracy to the aimbot's shots.")
-local Aimbot_Hitchance_Method = Menu.Combo("Aimbot","Aimbot","Hitchance Trace Method", {"Uniform Trace","Precalculated Random Trace","Runtime Random Seed Trace"}, 0, "Uniform Trace uses a uniform distribution of traces,it's not random and has a consistent pattern.Precalculated Trace uses random angles that are pre-calculated at script startup.Runtime Random Seed Trace uses UserCmd's random seed for generating the randomness.")
-local Aimbot_Enforce_Hitbox = Menu.Switch("Aimbot","Aimbot","Force Shoot Center Hitbox",false,"By default,the aimbot will shoot with whatever angle it is at.With this enabled,the aimbot will forcefully shoot the center of the hitbox,making the shot more accurate.This might make your aimbot look more obvious.")
-local Aimbot_AutoScope_Switch = Menu.Switch("Aimbot","Aimbot","Auto Scope",true,"")
-local Aimbot_AutoUnscope_Switch = Menu.Switch("Aimbot","Aimbot","Auto Unscope",true,"")
-local Aimbot_AutoCrouch_Switch = Menu.Switch("Aimbot","Aimbot","Auto Crouch",false,"Buggy : Fails in some situation.Mostly fails in situations where crouching will make the enemy non visible which will result in an instant uncrouch and then it will loop between crouching and uncrouching causing you to \"jitter crouch\" ")
-local Aimbot_AutoReload_Switch = Menu.Switch("Aimbot","Aimbot","Auto Reload",true,"")
-local Aimbot_AutoReload = Menu.SliderInt("Aimbot","Aimbot","Auto Reload Threshold",25,1,100,"If your active weapon's ammo goes below this amount in percentage,it will automatically reload your weapon.")
+-- local Difference2DLimit = Menu.SliderFloat("Walkbot","Walkbot", "Distance to node limit", 20.0, 1.0, 500.0, "If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
+local Difference2DLimit = Walkbot_MenuGroup:slider("Distance to node limit",1.0,500.0,20.0,1)
+Difference2DLimit:set_tooltip("Increasing this will make the path finding faster,at the cost of your FPS.")
 
-local AutoQueue_Switch = Menu.Switch("Misc","Misc", "Auto queue", true, "Automatically queues for you.")
-local AutoReconnect_Switch = Menu.Switch("Misc","Misc", "Auto reconnect", true, "Automatically reconnects to an ongoing match.")
-local AutoDisconnect_Switch = Menu.Switch("Misc","Misc", "Auto disconnect", true, "Automatically disconnects upon match end.")
-local AutoWeaponSwitch_Switch = Menu.Switch("Misc","Misc", "Auto switch to best weapon", true, "Automatically switches to the best weapon in your weapon slots.")
+-- local Z_Limit = Menu.SliderFloat("Walkbot","Walkbot", "Distance to node Z-limit", 50.0, 1.0, 500.0, "Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
+local Z_Limit = Walkbot_MenuGroup:slider("Distance to node Z-limit",1.0, 500.0,50.0,1.0)
+Z_Limit:set_tooltip("Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
+
+-- local ThresholdTime = Menu.SliderInt("Walkbot","Walkbot", "Obstacle avoid time limit", 1, 1, 60, "How long you want each method to avoid obstacles to last,in seconds.") -- time to switch between avoidance methods
+local ThresholdTime = Walkbot_MenuGroup:slider("Obstacle avoid time limit",1,60,1,1)
+ThresholdTime:set_tooltip("How long you want each method to avoid obstacles to last,in seconds.")
+
+-- local ThresholdTimeReset = Menu.SliderInt("Walkbot","Walkbot", "Obstacle avoid cycle reset time limit", 1, 1, 60, "Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")  -- time after moving to reset CycleAttempt to 0 again so the next time we're stuck,we will loop from the first method again,in seconds.
+local ThresholdTimeReset = Walkbot_MenuGroup:slider("Obstacle avoid cycle reset time limit",1,60,1,1)
+ThresholdTimeReset:set_tooltip("Time after moving to reset the obstacle avoiding cycle so the next time we're stuck,we will loop from the first method again,in seconds.")
+
+-- local TimeToMove = Menu.SliderFloat("Walkbot","Walkbot", "Enemy Last Seen Threshold", 1.0, 0.0, 60.0, "How long you should stay slow walking / scoped / crouching since the last time you saw an enemy.")
+local TimeToMove = Walkbot_MenuGroup:slider("Enemy Last Seen Threshold",0.0,60.0,1.0,1.0)
+TimeToMove:set_tooltip("How long you should stay slow walking / scoped / crouching since the last time you saw an enemy.")
+
+-- local Target_Dormant = Menu.Switch("Walkbot","Walkbot","Target Dormant Player",true,"Buggy : Might get stuck sometimes.")
+local Target_Dormant = Walkbot_MenuGroup:switch("Target Dormant Player",true)
+Target_Dormant:set_tooltip("Targets non-networked players.")
+
+
+local Aimbot_MenuGroup = ui.create("Aimbot", "Aimbot")
+
+-- local Aimbot_Enable = Menu.Switch("Aimbot","Aimbot","Enable",false,"Global switch for the aimbot.")
+local Aimbot_Enable = Aimbot_MenuGroup:switch("Enable",false)
+Aimbot_Enable:set_tooltip("Global switch for the aimbot.")
+
+-- local Aimbot_SilentAim = Menu.Switch("Aimbot","Aimbot","Silent Aim",false,"Prevents the aiming angles from applying to your engine angles.")
+local Aimbot_SilentAim = Aimbot_MenuGroup:switch("Silent Aim",false)
+Aimbot_SilentAim:set_tooltip("Prevents the aiming angles from applying to your engine angles.")
+
+-- local BodyAim_Switch = Menu.Switch("Aimbot","Aimbot","Prefer body aim",true,"Prioritizes aiming for the body.If not possible,aim for the head.")
+local BodyAim_Switch = Aimbot_MenuGroup:switch("Prefer body aim",true)
+BodyAim_Switch:set_tooltip("Prioritizes aiming for the body.If not possible,aim for the head.")
+
+-- local Aimbot_Speed = Menu.SliderInt("Aimbot","Aimbot","Speed",20,1,100,"Controls the speed of the aimbot.")
+local Aimbot_Speed = Aimbot_MenuGroup:slider("Speed",1,100,20,1)
+Aimbot_Speed:set_tooltip("Controls the speed of the aimbot.")
+
+-- local Aimbot_Randomize_Speed = Menu.Switch("Aimbot","Aimbot","Randomize Speed",false,"Will randomize the speed with the above value as the limit.")
+local Aimbot_Randomize_Speed = Aimbot_MenuGroup:switch("Randomize Speed",false)
+Aimbot_Randomize_Speed:set_tooltip("Will randomize the speed with the above value as the limit.")
+
+-- local Aimbot_Smoothing_Method = Menu.Combo("Aimbot","Aimbot", "Smoothing Method", {"Constant","Linear"}, 1, "Linear means the aimbot will have varying speeds.It will try to turn faster if the angle to target is bigger.Looks more obvious.Constant means it will turn at a constant speed regardless of how far the target angle is.Looks more robotic and slower but is more consistent.")
+local Aimbot_Smoothing_Method_Combo_Table = {
+    "Constant",
+    "Linear"
+}
+local Aimbot_Smoothing_Method = Aimbot_MenuGroup:combo("Smoothing Method",Aimbot_Smoothing_Method_Combo_Table)
+Aimbot_Smoothing_Method:set_tooltip("Linear means the aimbot will have varying speeds.It will try to turn faster if the angle to target is bigger.Looks more obvious.Constant means it will turn at a constant speed regardless of how far the target angle is.Looks more robotic and slower but is more consistent.")
+
+-- local Aimbot_Hitchance = Menu.SliderInt("Aimbot","Aimbot","Hitchance",50,1,100,"Enforces more accuracy to the aimbot's shots.")
+local Aimbot_Hitchance = Aimbot_MenuGroup:slider("Hitchance",1,100,50,1)
+Aimbot_Hitchance:set_tooltip("Enforces more accuracy to the aimbot's shots.")
+
+local Aimbot_Hitchance_Method_Combo_Table = {
+    "Runtime Uniform Trace",
+    "Pre-calculated Random Trace",
+    "Runtime Random Trace"
+}
+-- local Aimbot_Hitchance_Method = Menu.Combo("Aimbot","Aimbot","Hitchance Trace Method", {"Uniform Trace","Precalculated Random Trace","Runtime Random Seed Trace"}, 0, "Uniform Trace uses a uniform distribution of traces,it's not random and has a consistent pattern.Precalculated Trace uses random angles that are pre-calculated at script startup.Runtime Random Seed Trace uses UserCmd's random seed for generating the randomness.")
+local Aimbot_Hitchance_Method = Aimbot_MenuGroup:combo("Hitchance Trace Method",Aimbot_Hitchance_Method_Combo_Table)
+-- Aimbot_Hitchance_Method:set_tooltip("Uniform Trace uses a uniform distribution of traces,it's not random and has a consistent pattern.Precalculated Trace uses random angles that are pre-calculated at script startup.Runtime Random Seed Trace uses UserCmd's random seed for generating the randomness.")
+
+-- local Aimbot_Enforce_Hitbox = Menu.Switch("Aimbot","Aimbot","Force Shoot Center Hitbox",false,"By default,the aimbot will shoot with whatever angle it is at.With this enabled,the aimbot will forcefully shoot the center of the hitbox,making the shot more accurate.This might make your aimbot look more obvious.")
+local Aimbot_Enforce_Hitbox = Aimbot_MenuGroup:switch("Force Shoot Center Hitbox",false)
+Aimbot_Enforce_Hitbox:set_tooltip("By default,the aimbot will shoot with whatever angle it is at.With this enabled,the aimbot will forcefully shoot the center of the hitbox,making the shot more accurate.This might make your aimbot look more obvious.")
+
+-- local Aimbot_AutoScope_Switch = Menu.Switch("Aimbot","Aimbot","Auto Scope",true,"")
+local Aimbot_AutoScope_Switch = Aimbot_MenuGroup:switch("Auto Scope",true)
+Aimbot_AutoScope_Switch:set_tooltip("Automatically scopes in your weapon.")
+
+-- local Aimbot_AutoUnscope_Switch = Menu.Switch("Aimbot","Aimbot","Auto Unscope",true,"")
+local Aimbot_AutoUnscope_Switch = Aimbot_MenuGroup:switch("Auto Unscope",true)
+Aimbot_AutoUnscope_Switch:set_tooltip("Automatically unscopes your weapon.")
+
+-- local Aimbot_AutoCrouch_Switch = Menu.Switch("Aimbot","Aimbot","Auto Crouch",false,"Buggy : Fails in some situation.Mostly fails in situations where crouching will make the enemy non visible which will result in an instant uncrouch and then it will loop between crouching and uncrouching causing you to \"jitter crouch\" ")
+local Aimbot_AutoCrouch_Switch = Aimbot_MenuGroup:switch("Auto Crouch",false)
+Aimbot_AutoCrouch_Switch:set_tooltip("Buggy : Fails in some situation.Mostly fails in situations where crouching will make the enemy non visible which will result in an instant uncrouch and then it will loop between crouching and uncrouching causing you to \"jitter crouch\" ")
+
+-- local Aimbot_AutoReload_Switch = Menu.Switch("Aimbot","Aimbot","Auto Reload",true,"")
+local Aimbot_AutoReload_Switch = Aimbot_MenuGroup:switch("Auto Reload",true)
+Aimbot_AutoReload_Switch:set_tooltip("Automatically reloads your weapon.")
+
+-- local Aimbot_AutoReload = Menu.SliderInt("Aimbot","Aimbot","Auto Reload Threshold",25,1,100,"If your active weapon's ammo goes below this amount in percentage,it will automatically reload your weapon.")
+local Aimbot_AutoReload = Aimbot_MenuGroup:slider("Auto Reload Threshold",1,100,25,1)
+Aimbot_AutoReload:set_tooltip("If your active weapon's ammo goes below this amount in percentage,it will automatically reload your weapon.")
+
+local Misc_MenuGroup = ui.create("Misc", "Misc")
+
+-- local AutoQueue_Switch = Menu.Switch("Misc","Misc", "Auto queue", true, "Automatically queues for you.")
+local AutoQueue_Switch = Misc_MenuGroup:switch("Auto Queue",true)
+AutoQueue_Switch:set_tooltip("Automatically queues for you.")
+
+-- local AutoReconnect_Switch = Menu.Switch("Misc","Misc", "Auto reconnect", true, "Automatically reconnects to an ongoing match.")
+local AutoReconnect_Switch = Misc_MenuGroup:switch("Auto reconnect",true)
+AutoReconnect_Switch:set_tooltip("Automatically reconnects to an ongoing match.")
+
+-- local AutoDisconnect_Switch = Menu.Switch("Misc","Misc", "Auto disconnect", true, "Automatically disconnects upon match end.")
+local AutoDisconnect_Switch = Misc_MenuGroup:switch("Auto Disconnect",true)
+AutoDisconnect_Switch:set_tooltip("Automatically disconnects upon match end.")
+
+-- local AutoWeaponSwitch_Switch = Menu.Switch("Misc","Misc", "Auto switch to best weapon", true, "Automatically switches to the best weapon in your weapon slots.")
+local AutoWeaponSwitch_Switch = Misc_MenuGroup:switch("Auto switch to best weapon",true)
+AutoWeaponSwitch_Switch:set_tooltip("Automatically switches to the best weapon in your weapon slots.")
 
 local Precomputed_Seeds = {}
 
+-- returns table of items that needs to be bought
+local function CustomTableIndexFunction(t,i)
+    for _,v in ipairs(t) do
+        if v[1] == i then
+            return v[2]
+        end
+    end
+end
 
+local function AutoBuyGenerateOptionName(OptionTable)
+    local GeneratedTable = {}
+    for _,v in ipairs(OptionTable) do
+        table.insert(GeneratedTable,v[1])
+    end
+    return GeneratedTable
+end
+
+local function GetIndexFromSelectedCombo(t,index)
+    for i = 1,#t do
+        if index == t[i] then
+            return i - 1
+        end
+    end
+end
 
 local primaryWeapons = {
-    { "None", nil, nil };
-    { "AutoSniper", "scar20" };
-    { "Scout", "ssg08" };
-    { "AWP", "awp" };
-    { "M249", "m249" };
-    { "AUG | SG553", "aug" };
-    { "AK  |  M4", "m4a1" };
-    { "Famas  |  Galil", "galilar" };
-    { "P90", "p90" };
-    { "UMP-45", "ump45" };
-    { "XM1014", "xm1014"};
-    { "Bizon", "bizon"};
-    { "Mag7/Sawed-Off", "mag7"};
-    { "Negev", "negev"};
-    { "MP7/MP5", "mp7"};
-    { "MP9/Mac-10", "mp9"};
-    { "Nova", "nova"};
-};
+    {"None",            {nil}       },
+    {"AutoSniper",      {"scar20"}  },
+    {"Scout",           {"ssg08"}   },
+    {"AWP",             {"awp"}     },
+    {"M249",            {"m249"}    },
+    {"AUG | SG553",     {"aug"}     },
+    {"AK  |  M4",       {"m4a1"}    },
+    {"Famas  |  Galil", {"galilar"} },
+    {"P90",             {"p90"}     },
+    {"UMP-45",          {"ump45"}   },
+    {"XM1014",          {"xm1014"}  },
+    {"Bizon",           {"bizon"}   },
+    {"Mag7/Sawed-Off",  {"mag7"}    },
+    {"Negev",           {"negev"}   },
+    {"MP7/MP5",         {"mp7"}     },
+    {"MP9/Mac-10",      {"mp9"}     },
+    {"Nova",            {"nova"}    }
+}
+
+primaryWeapons.__index = CustomTableIndexFunction
+setmetatable(primaryWeapons,primaryWeapons)
+
 local secondaryWeapons = {
-    { "None", nil, nil };
-    { "Dual Elites", "elite" };
-    { "Desert Eagle | R8 Revolver", "deagle" };
-    { "Five Seven | Tec 9", "tec9" };
-    { "P250", "p250" };
-};
-local armors = {
-    { "None", nil, nil };
-    { "Kevlar Vest", "vest", nil };
-    { "Kevlar Vest + Helmet", "vest", "vesthelm" };
-};
-local granades = {
-    { "Off", nil, nil };
-    { "Grenade", "hegrenade", nil };
-    { "Flashbang", "flashbang", nil };
-    { "Smoke Grenade", "smokegrenade", nil };
-    { "Decoy Grenade", "decoy", nil };
-    { "Molotov | Incindiary Grenade", "molotov", "incgrenade" };
-};
+    {"None",                        {nil}       },
+    {"Dual Elites",                 {"elite"}   },
+    {"Desert Eagle | R8 Revolver",  {"deagle"}  },
+    {"Five Seven | Tec 9",          {"tec9" }   },
+    {"P250",                        {"p250"}    }
+}
+secondaryWeapons.__index = CustomTableIndexFunction
+setmetatable(secondaryWeapons,secondaryWeapons)
 
+local equipments = {
+    {"Kevlar Vest",                 {"vest"}                    },
+    {"Kevlar Vest + Helmet",        {"vest", "vesthelm" }       },
+    {"Grenade",                     {"hegrenade"}               },
+    {"Flashbang",                   {"flashbang"}               },
+    {"Smoke Grenade",               {"smokegrenade"}            },
+    {"Decoy Grenade",               {"decoy"}                   },
+    {"Molotov | Incindeary Grenade",{"molotov", "incgrenade" }  }
+}
+equipments.__index = CustomTableIndexFunction
+setmetatable(equipments,equipments)
 
-local AutoBuy_Switch = Menu.Switch("Auto Buy","Auto Buy","Enable",false,"")
-local AutoBuy_Print_Logs = Menu.Switch("Auto Buy","Auto Buy", "Print Logs", false,"")
-local AutoBuy_PrimaryWeapon = Menu.Combo("Auto Buy","Auto Buy", "Primary Weapon", {primaryWeapons[1][1], primaryWeapons[2][1], primaryWeapons[3][1], primaryWeapons[4][1], primaryWeapons[5][1], primaryWeapons[6][1],primaryWeapons[7][1],primaryWeapons[8][1],primaryWeapons[9][1],primaryWeapons[10][1],primaryWeapons[11][1],primaryWeapons[12][1],primaryWeapons[13][1],primaryWeapons[14][1],primaryWeapons[15][1],primaryWeapons[16][1],primaryWeapons[17][1]}, 0, "")
-local AutoBuy_SecondaryWeapon = Menu.Combo("Auto Buy","Auto Buy", "Secondary Weapon", {secondaryWeapons[1][1], secondaryWeapons[2][1], secondaryWeapons[3][1], secondaryWeapons[4][1]}, 0, "")
-local AutoBuy_Armor = Menu.Combo("Auto Buy","Auto Buy", "Armor", {armors[1][1], armors[2][1], armors[3][1]}, 0, "")
-local AutoBuy_Grenade_Slot1 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #1", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
-local AutoBuy_Grenade_Slot2 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #2", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
-local AutoBuy_Grenade_Slot3 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #3", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
-local AutoBuy_Grenade_Slot4 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #4", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
-local AutoBuy_Taser_Switch = Menu.Switch("Auto Buy","Auto Buy","Buy Taser",false,"")
-local AutoBuy_Defuser_Switch = Menu.Switch("Auto Buy","Auto Buy","Buy Defuser",false,"")
+local AutoBuy_MenuGroup = ui.create("Auto Buy", "Auto Buy")
 
-local function buy(wat)
-    if (wat == nil) then return end
-    if (AutoBuy_Print_Logs:Get()) then
-        print('Bought x1 ' .. wat)
+-- local AutoBuy_Switch = Menu.Switch("Auto Buy","Auto Buy","Enable",false,"")
+local AutoBuy_Switch = AutoBuy_MenuGroup:switch("Enable",false)
+
+-- local AutoBuy_Print_Logs = Menu.Switch("Auto Buy","Auto Buy", "Print Logs", false,"")
+local AutoBuy_Print_Logs = AutoBuy_MenuGroup:switch("Print Logs",false)
+
+-- local AutoBuy_PrimaryWeapon = Menu.Combo("Auto Buy","Auto Buy", "Primary Weapon", {primaryWeapons[1][1], primaryWeapons[2][1], primaryWeapons[3][1], primaryWeapons[4][1], primaryWeapons[5][1], primaryWeapons[6][1],primaryWeapons[7][1],primaryWeapons[8][1],primaryWeapons[9][1],primaryWeapons[10][1],primaryWeapons[11][1],primaryWeapons[12][1],primaryWeapons[13][1],primaryWeapons[14][1],primaryWeapons[15][1],primaryWeapons[16][1],primaryWeapons[17][1]}, 0, "")
+local AutoBuy_PrimaryWeapon = AutoBuy_MenuGroup:combo("Primary Weapon",AutoBuyGenerateOptionName(primaryWeapons))
+
+-- local AutoBuy_SecondaryWeapon = Menu.Combo("Auto Buy","Auto Buy", "Secondary Weapon", {secondaryWeapons[1][1], secondaryWeapons[2][1], secondaryWeapons[3][1], secondaryWeapons[4][1]}, 0, "")
+local AutoBuy_SecondaryWeapon = AutoBuy_MenuGroup:combo("Secondary Weapon",AutoBuyGenerateOptionName(secondaryWeapons))
+
+local AutoBuy_Equipment = AutoBuy_MenuGroup:selectable("Equipment",AutoBuyGenerateOptionName(equipments))
+
+-- -- local AutoBuy_Armor = Menu.Combo("Auto Buy","Auto Buy", "Armor", {armors[1][1], armors[2][1], armors[3][1]}, 0, "")
+-- local AutoBuy_Armor = AutoBuy_MenuGroup:combo("Armor",{armors[1][1], armors[2][1], armors[3][1]})
+
+-- -- local AutoBuy_Grenade_Slot1 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #1", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+-- local AutoBuy_Grenade_Slot1 = AutoBuy_MenuGroup:combo("Grenade Slot #1",{granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]})
+
+-- -- local AutoBuy_Grenade_Slot2 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #2", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+-- local AutoBuy_Grenade_Slot2 = AutoBuy_MenuGroup:combo("Grenade Slot #2",{granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]})
+
+-- -- local AutoBuy_Grenade_Slot3 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #3", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+-- local AutoBuy_Grenade_Slot3 = AutoBuy_MenuGroup:combo("Grenade Slot #3",{granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]})
+
+-- -- local AutoBuy_Grenade_Slot4 = Menu.Combo("Auto Buy","Auto Buy", "Grenade Slot #4", {granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]}, 0, "")
+-- local AutoBuy_Grenade_Slot4 = AutoBuy_MenuGroup:combo("Grenade Slot #4",{granades[1][1], granades[2][1], granades[3][1], granades[4][1], granades[5][1], granades[6][1]})
+
+-- -- local AutoBuy_Taser_Switch = Menu.Switch("Auto Buy","Auto Buy","Buy Taser",false,"")
+-- local AutoBuy_Taser_Switch = AutoBuy_MenuGroup:switch("Buy Taser",false)
+
+-- -- local AutoBuy_Defuser_Switch = Menu.Switch("Auto Buy","Auto Buy","Buy Defuser",false,"")
+-- local AutoBuy_Defuser_Switch = AutoBuy_MenuGroup:switch("Buy Defuser",false)
+
+local function AutoBuy()
+    for k,v in ipairs(primaryWeapons[AutoBuy_PrimaryWeapon:get()]) do
+        utils.console_exec("buy " .. "\"" .. v .. "\";" )
     end
-    EngineClient.ExecuteClientCmd('buy ' .. '\"' .. wat .. '\"' ..  ';')
-end
 
-local function buyTable(table)
-    for i, j in pairs(table) do
-        buy(j)
+    for k,v in ipairs(secondaryWeapons[AutoBuy_SecondaryWeapon:get()]) do
+        utils.console_exec("buy " .. "\"" .. v .. "\";" )
     end
-end
 
-local function buyWeapon(selection, table)
-    local selection = selection:Get()
-    local weaponToBuy = table[selection + 1][2]
-    buy(weaponToBuy)
-end
-
-local function buyGrenades(selections)
-    for k, selection in pairs(selections) do
-        local selection = selection:Get()
-        local grenadeTable = granades[selection + 1]
-        buyTable({ grenadeTable[2], grenadeTable[3] })
+    for k,v in ipairs(AutoBuy_Equipment:get()) do
+        for i,j in ipairs(v)do
+            utils.console_exec("buy " .. "\"" .. j .. "\";" )
+        end
     end
-end
 
+end
 
 local buttons = {
     IN_ATTACK = 1,
@@ -532,6 +693,20 @@ local Hitboxes_BodyAim = {
 	
 }
 
+local CSWeaponType = 
+{
+	WEAPONTYPE_KNIFE            = 0,
+	WEAPONTYPE_PISTOL           = 1,
+	WEAPONTYPE_SUBMACHINEGUN    = 2,
+	WEAPONTYPE_RIFLE            = 3,
+	WEAPONTYPE_SHOTGUN          = 4,
+	WEAPONTYPE_SNIPER_RIFLE     = 5,
+	WEAPONTYPE_MACHINEGUN       = 6,
+	WEAPONTYPE_C4               = 7,
+	WEAPONTYPE_PLACEHOLDER      = 8,
+	WEAPONTYPE_GRENADE          = 9,
+	WEAPONTYPE_UNKNOWN          = 10
+};
 
 --CustomBuffer:Read(4)
 
@@ -1174,7 +1349,7 @@ function INavFile:Load(Buffer)
 end
 local function LoadMap(MapName)
 
-    local MapConcattedWithDirectory = EngineClient.GetGameDirectory() .. "\\maps\\" .. MapName .. ".nav"
+    local MapConcattedWithDirectory = common.get_game_directory() .. "\\maps\\" .. MapName .. ".nav"
 
     local fileHandle = ffi.C.CreateFileA(MapConcattedWithDirectory,0x10000000,0x1,0,4,0x80,0)
 
@@ -1261,7 +1436,7 @@ end
 local function FindNearestAreaToPlayer(AreaList,player)
 
     local player_position = Vector3D:new()
-    player_position:CopyOther(player:GetEyePosition())
+    player_position:CopyOther(player:get_origin())
 
     local Latest_Distance = math.huge
     local Nearest_Area = nil
@@ -1347,41 +1522,62 @@ local ClosedList = {}
 
 local LastFoundPlayer = nil
 local function FindNearestPlayer(FromPlayer)
-    local PlayerList = EntityList.GetPlayers()
+    -- local PlayerList = EntityList.GetPlayers()
 
     local NearestDistance = math.huge
     local NearestPlayer = nil
 
-    local FromPlayerRenderOrigin = FromPlayer:GetEyePosition()
+    local FromPlayerRenderOrigin = FromPlayer:get_origin()
     local FromPlayerPos = Vector3D:new(FromPlayerRenderOrigin.x,FromPlayerRenderOrigin.y,FromPlayerRenderOrigin.z)
 
-    for _,Player in ipairs(PlayerList) do
-        if Player ~= FromPlayer and Player:IsPlayer() then
-            local BasePlayer = Player:GetPlayer()
-            local NetworkState = BasePlayer:GetNetworkState() 
-            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and BasePlayer:EntIndex() ~= LastFoundPlayer and ((NetworkState == 1 and Target_Dormant:Get())or NetworkState == 0) and BasePlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
+    entity.get_players(true,Target_Dormant:get(),
+    function(Player) 
+    
+        if Player ~= FromPlayer then
+            if Player:is_alive() and Player:is_enemy() and Player:get_index() ~= LastFoundPlayer and Player.m_fImmuneToGunGameDamageTime == 0 then
 
-                local PlayerOrigin = BasePlayer:GetEyePosition()
+                local PlayerOrigin = Player:get_origin()
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
                 local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
                 if( DistanceToFromPlayer < NearestDistance) then
                     NearestDistance = DistanceToFromPlayer
-                    NearestPlayer = BasePlayer
+                    NearestPlayer = Player
                 end
             end
             
         end
-    end
+    
+    
+    
+    end)
+
+    -- for _,Player in ipairs(PlayerList) do
+    --     if Player ~= FromPlayer and Player:IsPlayer() then
+    --         local BasePlayer = Player:GetPlayer()
+    --         local NetworkState = BasePlayer:GetNetworkState() 
+    --         if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and BasePlayer:EntIndex() ~= LastFoundPlayer and ((NetworkState == 1 and Target_Dormant:Get())or NetworkState == 0) and BasePlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
+
+    --             local PlayerOrigin = BasePlayer:GetEyePosition()
+    --             local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
+
+    --             local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
+    --             if( DistanceToFromPlayer < NearestDistance) then
+    --                 NearestDistance = DistanceToFromPlayer
+    --                 NearestPlayer = BasePlayer
+    --             end
+    --         end
+            
+    --     end
+    -- end
 
     if(NearestPlayer ~= nil)then
-        LastFoundPlayer = NearestPlayer:EntIndex()
+        LastFoundPlayer = NearestPlayer:get_index()
     else
         if LastFoundPlayer ~= nil then
-            local BasePlayer_LastFoundPlayer = EntityList.GetPlayer(LastFoundPlayer)
+            local BasePlayer_LastFoundPlayer = entity.get(LastFoundPlayer,false)
             if BasePlayer_LastFoundPlayer then 
-                local NetworkState = BasePlayer_LastFoundPlayer:GetNetworkState()
-                if BasePlayer_LastFoundPlayer:IsPlayer() and BasePlayer_LastFoundPlayer:IsAlive() and not BasePlayer_LastFoundPlayer:IsTeamMate() and ((NetworkState == 1 and Target_Dormant:Get()) or NetworkState == 0) and BasePlayer_LastFoundPlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
+                if BasePlayer_LastFoundPlayer:is_alive() and BasePlayer_LastFoundPlayer:is_enemy() and BasePlayer_LastFoundPlayer.m_fImmuneToGunGameDamageTime == 0 then
                     NearestPlayer = BasePlayer_LastFoundPlayer
                 end
             end
@@ -1394,25 +1590,25 @@ end
 
 
 local function IsVisible(FromPlayer,ToPlayer)
-    local FromPlayer_EyePos = FromPlayer:GetEyePosition()
+    local FromPlayer_EyePos = FromPlayer:get_eye_position()
 
-    if not BodyAim_Switch:Get() then
+    if not BodyAim_Switch:get() then
         for _,hitbox in ipairs(Hitboxes_Normal) do 
     
-            local ToPlayer_TargetPos = ToPlayer:GetHitboxCenter(hitbox)
+            local ToPlayer_TargetPos = ToPlayer:get_hitbox_position(hitbox)
     
-            local trace_result = EngineTrace.TraceRay(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
-            if(trace_result.hit_entity and trace_result.hit_entity:EntIndex() == ToPlayer:EntIndex())then 
+            local trace_result = utils.trace_line(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
+            if (trace_result.entity and trace_result.entity:get_index() == ToPlayer:get_index()) then 
                 return hitbox
             end
         end
     else
         for _,hitbox in ipairs(Hitboxes_BodyAim) do 
     
-            local ToPlayer_TargetPos = ToPlayer:GetHitboxCenter(hitbox)
+            local ToPlayer_TargetPos = ToPlayer:get_hitbox_position(hitbox)
     
-            local trace_result = EngineTrace.TraceRay(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
-            if(trace_result.hit_entity and trace_result.hit_entity:EntIndex() == ToPlayer:EntIndex())then 
+            local trace_result = utils.trace_line(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
+            if(trace_result.entity and trace_result.entity:get_index() == ToPlayer:get_index())then 
                 return hitbox
             end
         end
@@ -1426,35 +1622,61 @@ local function IsVisible(FromPlayer,ToPlayer)
 end
 
 local function Aimbot__FindNearestPlayer(FromPlayer)
-    local PlayerList = EntityList.GetPlayers()
+    -- local PlayerList = EntityList.GetPlayers()
 
     local NearestDistance = math.huge
     local NearestPlayer = nil
     local BestHitbox = nil
-    local FromPlayerEyePos = FromPlayer:GetEyePosition()
+    local FromPlayerEyePos = FromPlayer:get_eye_position()
     local FromPlayerPos = Vector3D:new(FromPlayerEyePos.x,FromPlayerEyePos.y,FromPlayerEyePos.z)
 
-    for _,Player in ipairs(PlayerList) do
-        if Player ~= FromPlayer and Player:IsPlayer() then
-            local BasePlayer = Player:GetPlayer()
-            local TempHitboxChoice = IsVisible(FromPlayer,BasePlayer)
-            
-            if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and TempHitboxChoice > -1 and BasePlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
 
-                local PlayerOrigin = BasePlayer:GetEyePosition()
+    entity.get_players(true,false,function(Player)
+    
+        if Player ~= FromPlayer then
+            -- print("Test")
+            local TempHitboxChoice = IsVisible(FromPlayer,Player)
+            -- print(TempHitboxChoice)
+            if Player:is_alive() and Player:is_enemy()  and TempHitboxChoice > -1 and Player.m_fImmuneToGunGameDamageTime == 0 then
+
+                local PlayerOrigin = Player:get_eye_position()
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
 
                 local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
                 if( DistanceToFromPlayer < NearestDistance) then
                     NearestDistance = DistanceToFromPlayer
-                    NearestPlayer = BasePlayer
+                    NearestPlayer = Player
                     BestHitbox = TempHitboxChoice
                 end
             end
             
         end
-    end
+    
+    
+    
+    end)
 
+    -- for _,Player in ipairs(PlayerList) do
+    --     if Player ~= FromPlayer and Player:IsPlayer() then
+    --         local BasePlayer = Player:GetPlayer()
+    --         local TempHitboxChoice = IsVisible(FromPlayer,BasePlayer)
+            
+    --         if BasePlayer:IsAlive() and not BasePlayer:IsTeamMate() and not BasePlayer:IsDormant() and TempHitboxChoice > -1 and BasePlayer:GetProp("m_fImmuneToGunGameDamageTime") == 0 then
+
+    --             local PlayerOrigin = BasePlayer:GetEyePosition()
+    --             local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
+
+    --             local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
+    --             if( DistanceToFromPlayer < NearestDistance) then
+    --                 NearestDistance = DistanceToFromPlayer
+    --                 NearestPlayer = BasePlayer
+    --                 BestHitbox = TempHitboxChoice
+    --             end
+    --         end
+            
+    --     end
+    -- end
+    -- print("NearestPlayer",NearestPlayer)
     return  { NearestPlayer , BestHitbox } 
 end
 
@@ -1475,9 +1697,9 @@ end
 
 local function PrepareToFindAnotherNode()
 
-    math.randomseed(GlobalVars.tickcount)
+    math.randomseed(globals.tickcount)
 
-    local local_player = EntityList.GetLocalPlayer()
+    local local_player = entity.get_local_player()
 
     StartingNode = AreaNode:new()
     StartingNode.area = FindNearestAreaToPlayer(INavFile.m_areas,local_player)
@@ -1488,7 +1710,7 @@ local function PrepareToFindAnotherNode()
 
     
     if (ChosenPlayer ~= nil) then
-        print("Targetting player : " , ChosenPlayer:GetName())
+        print("Targetting player : " , ChosenPlayer:get_name())
         EndArea = FindNearestAreaToPlayer(INavFile.m_areas,ChosenPlayer)
     else
         EndArea = INavFile:GetNavAreaByID(math.random(1,#INavFile.m_areas))
@@ -1521,7 +1743,7 @@ end
 
 --local StartTime = GlobalVars.realtime
 local function FindPath()
-    local IterationsAllowed = IterationPerTick_Slider:Get()
+    local IterationsAllowed = IterationPerTick_Slider:get()
     local CurrentIteration = 0
 
     while(CurrentIteration < IterationsAllowed) do 
@@ -1599,12 +1821,12 @@ end
 
 
 local function CheckIfArrivedAtNode(cmd)
-    local local_player = EntityList.GetLocalPlayer()
-    local local_player_pos = local_player:GetRenderOrigin()
+    local local_player = entity.get_local_player()
+    local local_player_pos = local_player:get_origin()
 
     local NodeToMoveTo = Path[#Path]
     if(NodeToMoveTo ~= nil)then
-        if(not NodeToMoveTo.area.m_center:IsDifference3D(local_player_pos,Difference2DLimit:Get(),Z_Limit:Get())) then
+        if(not NodeToMoveTo.area.m_center:IsDifference3D(local_player_pos,Difference2DLimit:get(),Z_Limit:get())) then
             --print("arrived at path")
             table.remove(Path,#Path)
             if(#Path == 0) then
@@ -1619,16 +1841,16 @@ local function FixMovement(EngineAngle,cmd,fOldForward,fOldSidemove)
     local f1
     local f2
 
-    if(EngineAngle.yaw < 0.0)then
-        f1 = 360.0 + EngineAngle.yaw
+    if(EngineAngle.y < 0.0)then
+        f1 = 360.0 + EngineAngle.y
     else
-        f1 = EngineAngle.yaw
+        f1 = EngineAngle.y
     end
 
     if (cmd.viewangles.yaw < 0.0)then
-        f2 = 360.0 + cmd.viewangles.yaw
+        f2 = 360.0 + cmd.view_angles.y
     else
-        f2 = cmd.viewangles.yaw
+        f2 = cmd.view_angles.y
     end
 
     if (f2 < f1)then
@@ -1693,18 +1915,18 @@ local CycleAttempt = 1
 local CycleMethods = 8
 -- local LastLocation = nil
 local function ObstacleAvoid(cmd)
-    local tickrate = 1.0 / GlobalVars.interval_per_tick
+    local tickrate = 1.0 / globals.tickinterval
 
-    local local_player = EntityList.GetLocalPlayer()
+    local local_player = entity.get_local_player()
     local local_player_pos = Vector3D:new()
-    local local_player_weapon = local_player:GetActiveWeapon()
-    local_player_pos:CopyOther(local_player:GetRenderOrigin())
+    local local_player_weapon = local_player:get_player_weapon()
+    local_player_pos:CopyOther(local_player:get_origin())
     
     local max_speed = 230.0
     if local_player_weapon then
-        max_speed = local_player_weapon:GetMaxSpeed()
+        max_speed = local_player_weapon:get_max_speed()
     end
-    local local_player_speed = Vector3D:new(local_player:GetProp("m_vecVelocity[0]"),local_player:GetProp("m_vecVelocity[1]"),local_player:GetProp("m_vecVelocity[2]")):Length2D()
+    local local_player_speed = Vector3D:new(local_player.m_vecVelocity.x,local_player.m_vecVelocity.y,local_player.m_vecVelocity.z):Length2D()
 
     -- if(LastLocation ~= nil) then
     --     --print(LastLocation:DistTo2D(local_player_pos))
@@ -1716,9 +1938,11 @@ local function ObstacleAvoid(cmd)
     -- end
 
     -- print(local_player_speed >= 0.34 * max_speed)
+    -- print(local_player_speed)
+    -- print(0.10 * max_speed)
     if(local_player_speed >= 0.10 * max_speed) then
         MovingTicks = (MovingTicks + 1) % 6400
-        if(MovingTicks % tickrate * ThresholdTimeReset:Get() == 0) then
+        if(MovingTicks % tickrate * ThresholdTimeReset:get() == 0) then
             CycleAttempt = 0
         end
         NotMovingTicks = 1
@@ -1727,7 +1951,7 @@ local function ObstacleAvoid(cmd)
         MovingTicks = 1
     end
 
-    if (GlobalVars.tickcount % (tickrate * ThresholdTime:Get()) == 0) then
+    if (globals.tickcount % (tickrate * ThresholdTime:get()) == 0) then
         CycleAttempt = CycleAttempt % CycleMethods + 1
     end
 
@@ -1753,7 +1977,7 @@ local function ObstacleAvoid(cmd)
         elseif ( CycleAttempt == 4 ) then -- Just crouch
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK)
         elseif ( CycleAttempt == 5 ) then -- IN_USE what's in front of us
-            local LocalEyePos = local_player:GetEyePosition()
+            local LocalEyePos = local_player:get_eye_position()
             local LocalEyePosCustom = Vector3D:new()
             LocalEyePosCustom:CopyOther(LocalEyePos)
 
@@ -1771,30 +1995,30 @@ local function ObstacleAvoid(cmd)
 
             cmd.forwardmove = 0.0
             cmd.sidemove = 0.0
-            cmd.viewangles.pitch = AngleToVectorUse.x
-            cmd.viewangles.yaw = AngleToVectorUse.y
+            cmd.view_angles.x = AngleToVectorUse.x
+            cmd.view_angles.y = AngleToVectorUse.y
 
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
 
             
             
         elseif ( CycleAttempt == 6) then -- Shoot what's in front of us    
-            local LocalEyePos = local_player:GetEyePosition()
+            local LocalEyePos = local_player:get_eye_position()
             local LocalEyePosCustom = Vector3D:new()
             LocalEyePosCustom:CopyOther(LocalEyePos)
 
             local VectorToUseCustom = NodeToMoveTo.area.m_center
-            local VectorToUse = Vector.new(VectorToUseCustom.x,VectorToUseCustom.y,VectorToUseCustom.z)
+            local VectorToUse = vector(VectorToUseCustom.x,VectorToUseCustom.y,VectorToUseCustom.z)
 
-            local traced = EngineTrace.TraceRay(LocalEyePos, VectorToUse, local_player, 0x46004003)
+            local traced = utils.trace_line(LocalEyePos, VectorToUse, local_player, 0x46004003)
 
-            if(traced.hit_entity and traced.hit_entity:IsPlayer()) then
-                if(traced.hit_entity:GetPlayer():IsTeamMate()) then
+            if(traced.entity and traced.entity:get_classid() == 40) then
+                if(not traced.entity:is_enemy()) then
                     return
                 end
             end
 
-            local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
+            local TracedEndPosCustom = Vector3D:new(traced.end_pos.x,traced.end_pos.y,traced.end_pos.z)
             local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,NodeToMoveTo.area.m_center)
 
             if AngleToVectorUse == nil then return end
@@ -1803,8 +2027,8 @@ local function ObstacleAvoid(cmd)
             
             cmd.forwardmove = 0.0
             cmd.sidemove = 0.0
-            cmd.viewangles.pitch = AngleToVectorUse.x
-            cmd.viewangles.yaw = AngleToVectorUse.y
+            cmd.view_angles.x = AngleToVectorUse.x
+            cmd.view_angles.y = AngleToVectorUse.y
 
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
 
@@ -1831,11 +2055,11 @@ end
 local TimeSinceLastSeenEnemy = 0
 
 local function MoveToTarget(cmd)
-    local tickrate = 1.0 / GlobalVars.interval_per_tick
+    local tickrate = 1.0 / globals.tickinterval
 
-    local local_player = EntityList.GetLocalPlayer()
-    local local_player_pos = local_player:GetRenderOrigin()
-    local local_weapon = local_player:GetActiveWeapon()
+    local local_player = entity.get_local_player()
+    local local_player_pos = local_player:get_origin()
+    local local_weapon = local_player:get_player_weapon()
     
     -- for k,weapon_handle in ipairs(weapon_list)do
     --     local weapon= EntityList.GetClientEntityFromHandle(weapon_handle):GetWeapon()
@@ -1846,8 +2070,8 @@ local function MoveToTarget(cmd)
     --         -- :IsPistol()
     --     end
     -- end
-
-    local view_angles = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
+    
+    local view_angles = Angle:MakeNewAngleFromNLVector(render.camera_angles())
     -- local cmd_view_angles = Angle:MakeNewAngleFromNLAngle(cmd.viewangles)
     local NodeToMoveTo = Path[#Path]
 
@@ -1884,12 +2108,12 @@ local function PrecomputeSeed()
 	
 		local random_values = { }
 	
-		Utils.RandomSeed(bit.band(seed,0xff) + 1)
+		utils.random_seed(bit.band(seed,0xff) + 1)
 	
-		table.insert(random_values,Utils.RandomFloat(0.0,1.0))
-		table.insert(random_values,Utils.RandomFloat(0.0,Math.PI_2))
-		table.insert(random_values,Utils.RandomFloat(0.0,1.0))
-		table.insert(random_values,Utils.RandomFloat(0.0,Math.PI_2))
+		table.insert(random_values,utils.random_float(0.0,1.0))
+		table.insert(random_values,utils.random_float(0.0,Math.PI_2))
+		table.insert(random_values,utils.random_float(0.0,1.0))
+		table.insert(random_values,utils.random_float(0.0,Math.PI_2))
 		
 		
 		table.insert(Precomputed_Seeds,random_values)
@@ -1910,12 +2134,12 @@ local function CalculateSpread(weapon,seed,inaccuracy,spread,UsePrecomputedSeeds
         r3 = Precomputed_Seeds[seed][3]
         r4 = Precomputed_Seeds[seed][4]
     else
-        Utils.RandomSeed(bit.band(cmdSeed,0xff) + 1)
+        utils.random_seed(bit.band(cmdSeed,0xff) + 1)
 	
-        r1 = Utils.RandomFloat(0.0,1.0)
-        r2 = Utils.RandomFloat(0.0,Math.PI_2)
-        r3 = Utils.RandomFloat(0.0,1.0)
-        r4 = Utils.RandomFloat(0.0,Math.PI_2)
+        r1 = utils.random_float(0.0,1.0)
+        r2 = utils.random_float(0.0,Math.PI_2)
+        r3 = utils.random_float(0.0,1.0)
+        r4 = utils.random_float(0.0,Math.PI_2)
     end
     
 
@@ -1932,11 +2156,11 @@ local function CalculateSpread(weapon,seed,inaccuracy,spread,UsePrecomputedSeeds
     
 end
 
-local function CheckHitchancePrecomputed(angleToTarget,entity)
-    local local_player  = EntityList.GetLocalPlayer()
-    local weapon        = local_player:GetActiveWeapon() 
+local function CheckHitchancePrecomputed(angleToTarget,TargetEntity)
+    local local_player  = entity.get_local_player()
+    local weapon        = local_player:get_player_weapon()
 
-    local lp_eyepos     = local_player:GetEyePosition()
+    local lp_eyepos     = local_player:get_eye_position()
     
     local forward             = Vector3D:new()
     local right                 = Vector3D:new()
@@ -1944,10 +2168,10 @@ local function CheckHitchancePrecomputed(angleToTarget,entity)
 
     Math:AngleVectorsExtra(angleToTarget,forward,right,up)
 
-    local spread            = weapon:GetSpread(weapon)
-    local inaccuracy    = weapon:GetInaccuracy(weapon)  
+    local spread            = weapon:get_spread()
+    local inaccuracy    = weapon:get_inaccuracy() 
 
-    local needed_hits   =  math.ceil((Aimbot_Hitchance:Get() / 100) * 255)
+    local needed_hits   =  math.ceil((Aimbot_Hitchance:get() / 100) * 255)
     local total_hits        = 0
 
     for i = 1,255 do
@@ -1965,9 +2189,9 @@ local function CheckHitchancePrecomputed(angleToTarget,entity)
             lp_eyepos.z + (dir.z * 8192.0)
         )
 
-        local trace_result = EngineTrace.TraceRay(lp_eyepos, Vector.new(EndVec.x, EndVec.y, EndVec.z), local_player, 0x46004003)
+        local trace_result = utils.trace_line(lp_eyepos, vector(EndVec.x, EndVec.y, EndVec.z), local_player, 0x46004003)
 
-        if (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == entity:EntIndex()) then
+        if (trace_result.entity and trace_result.entity:get_index() == TargetEntity:get_index()) then
             total_hits = total_hits + 1
         end
 
@@ -1980,11 +2204,11 @@ local function CheckHitchancePrecomputed(angleToTarget,entity)
     return false
 end
 
-local function CheckHitchanceRandom(cmd,angleToTarget,entity)
-    local local_player  = EntityList.GetLocalPlayer()
-    local weapon        = local_player:GetActiveWeapon() 
+local function CheckHitchanceRandom(cmd,angleToTarget,TargetEntity)
+    local local_player  = entity.get_local_player()
+    local weapon        = local_player:get_player_weapon()
 
-    local lp_eyepos     = local_player:GetEyePosition()
+    local lp_eyepos     = local_player:get_eye_position()
     
     local forward             = Vector3D:new()
     local right                 = Vector3D:new()
@@ -1992,10 +2216,10 @@ local function CheckHitchanceRandom(cmd,angleToTarget,entity)
 
     Math:AngleVectorsExtra(angleToTarget,forward,right,up)
 
-    local spread            = weapon:GetSpread(weapon)
-    local inaccuracy    = weapon:GetInaccuracy(weapon)  
+    local spread            = weapon:get_spread()
+    local inaccuracy        = weapon:get_inaccuracy()
 
-    local needed_hits   =  math.ceil((Aimbot_Hitchance:Get() / 100) * 255)
+    local needed_hits   =  math.ceil((Aimbot_Hitchance:get() / 100) * 255)
     local total_hits        = 0
 
     for i = 1,255 do
@@ -2013,9 +2237,9 @@ local function CheckHitchanceRandom(cmd,angleToTarget,entity)
             lp_eyepos.z + (dir.z * 8192.0)
         )
 
-        local trace_result = EngineTrace.TraceRay(lp_eyepos, Vector.new(EndVec.x, EndVec.y, EndVec.z), local_player, 0x46004003)
+        local trace_result = utils.trace_line(lp_eyepos, vector(EndVec.x, EndVec.y, EndVec.z), local_player, 0x46004003)
 
-        if (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == entity:EntIndex()) then
+        if (trace_result.entity and trace_result.entity:get_index() == TargetEntity:get_index()) then
             total_hits = total_hits + 1
         end
 
@@ -2029,22 +2253,22 @@ local function CheckHitchanceRandom(cmd,angleToTarget,entity)
 end
 
 
-local function CheckHitchanceUniform (angle,entity)
+local function CheckHitchanceUniform (angle,TargetEntity)
   
-    local local_player = EntityList.GetLocalPlayer()
-    local weapon        = local_player:GetActiveWeapon() 
+    local local_player  = entity.get_local_player()
+    local weapon        = local_player:get_player_weapon()
 
     -- local viewAngles = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
     local start         = Vector3D:new()
-    start:CopyOther(local_player:GetEyePosition())
+    start:CopyOther(local_player:get_eye_position())
 
-    local spread            =   weapon:GetSpread(weapon)
-    local inaccuracy        =   weapon:GetInaccuracy(weapon)  
+    local spread            =   weapon:get_spread()
+    local inaccuracy        =   weapon:get_inaccuracy()
 
     local spreadAngle       = math.deg(spread + inaccuracy)
 
 
-    local needed_hits       =  math.ceil((Aimbot_Hitchance:Get() / 100) * 255)
+    local needed_hits       =  math.ceil((Aimbot_Hitchance:get() / 100) * 255)
     local total_hits        = 0
 
     for i = 1,255 do
@@ -2058,9 +2282,9 @@ local function CheckHitchanceUniform (angle,entity)
         Math:AngleVectors(shotAngle,forward)
         forward = forward:MultiplySingle(8192.0)
         local endpos        = (start + forward)
-        local trace_result  = EngineTrace.TraceRay(local_player:GetEyePosition(), Vector.new(endpos.x, endpos.y, endpos.z), local_player, 0x46004003)
+        local trace_result  = utils.trace_line(local_player:get_eye_position(), vector(endpos.x, endpos.y, endpos.z), local_player, 0x46004003)
 
-        if (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == entity:EntIndex()) then
+        if (trace_result.entity and trace_result.entity:get_index() == TargetEntity:get_index()) then
             total_hits = total_hits + 1
         end
 
@@ -2073,26 +2297,25 @@ local function CheckHitchanceUniform (angle,entity)
     return false
 end
 local function CanLocalPlayerShoot()
-    local local_player = EntityList.GetLocalPlayer()
-    local local_weapon = local_player:GetActiveWeapon()
-    local local_player_from_weapon_handle = EntityList.GetClientEntityFromHandle(local_weapon:GetProp("m_hOwnerEntity")):GetPlayer()
-
-    if not ( local_player_from_weapon_handle or local_weapon or local_player ) then
+    local local_player = entity.get_local_player()
+    local local_weapon = local_player:get_player_weapon()
+    
+    if not ( local_weapon or local_player ) then
         return false
     end
 
-    local weapon__clip1                 = local_weapon:GetProp("m_iClip1")
-    local weapon__m_flNextPrimaryAttack = local_weapon:GetProp("m_flNextPrimaryAttack")
-    local local_player__m_nTickBase     = local_player_from_weapon_handle:GetProp("m_nTickBase")
-    local local_player__m_flNextAttack  = local_player_from_weapon_handle:GetProp("m_flNextAttack")
+    local weapon__clip1                 = local_weapon.m_iClip1
+    local weapon__m_flNextPrimaryAttack = local_weapon.m_flNextPrimaryAttack
+    local local_player__m_nTickBase     = local_player.m_nTickBase
+    local local_player__m_flNextAttack  = local_player.m_flNextAttack
 
-    if(local_weapon:IsReloading() or weapon__clip1 <= 0)then
+    if(local_weapon:get_weapon_reload() ~= -1 or weapon__clip1 <= 0)then
         return false
     end
 
-    local flServerTime = local_player__m_nTickBase * GlobalVars.interval_per_tick
+    local flServerTime = local_player__m_nTickBase * globals.tickinterval
 
-    if(local_player__m_flNextAttack > flServerTime)then
+    if(local_player__m_flNextAttack > flServerTime) then
         return false
     end
 
@@ -2106,10 +2329,10 @@ local function CanHit_Angle(StartPos,CurrentAngle,PlayerSkip,TargetEntity)
     VectorFromAngle = VectorFromAngle:MultiplySingle(8192.0)
     VectorFromAngle = VectorFromAngle + StartPos
     
-    local VectorFromAngle_Converted = Vector.new(VectorFromAngle.x,VectorFromAngle.y,VectorFromAngle.z)
-    local trace_result = EngineTrace.TraceRay(StartPos, VectorFromAngle_Converted, PlayerSkip, 0x46004003)
+    local VectorFromAngle_Converted = vector(VectorFromAngle.x,VectorFromAngle.y,VectorFromAngle.z)
+    local trace_result = utils.trace_line(StartPos, VectorFromAngle_Converted, PlayerSkip, 0x46004003)
 
-    return (trace_result.hit_entity and trace_result.hit_entity:EntIndex() == TargetEntity:EntIndex())
+    return (trace_result.entity and trace_result.entity:get_index() == TargetEntity:get_index())
 
 end
 
@@ -2137,13 +2360,15 @@ local function BeMoreAccurate(cmd)
     -- cmd.forwardmove = negated_direction.x
     -- cmd.sidemove = negated_direction.y
 
-    local local_player = EntityList.GetLocalPlayer()
+    local local_player = entity.get_local_player()
 
     if not local_player then return end
 
-    local local_weapon = local_player:GetActiveWeapon()
+    local local_weapon = local_player:get_player_weapon()
 
-    if not local_weapon or local_weapon:IsReloading() then return end
+    if not local_weapon or local_weapon:get_weapon_reload() ~= -1 then 
+        return
+    end
 
     -- print("Stopping to max weapon speed")
     -- local weapon_max_speed = local_weapon:GetMaxSpeed()
@@ -2156,7 +2381,7 @@ local function BeMoreAccurate(cmd)
 
     if min_speed <= 0.0 then return end
 
-    if Aimbot_AutoCrouch_Switch:Get() then 
+    if Aimbot_AutoCrouch_Switch:get() then 
         cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK)
     end
     
@@ -2182,51 +2407,56 @@ local function BeMoreAccurate(cmd)
     
 end
 
-local RecoilScale = CVar.FindVar("weapon_recoil_scale")
+local RecoilScale = cvar.weapon_recoil_scale
 
 
 
 local LatestTargetAngle = Angle:new()
-local LatestAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
+local LatestAngle = Angle:MakeNewAngleFromNLVector(render.camera_angles())
 
 
 local function Aimbot(cmd)
 
-    if not Aimbot_Enable:Get() then return end
-    local tickrate = 1.0 / GlobalVars.interval_per_tick
+    if not Aimbot_Enable:get() then return end
+    local tickrate = 1.0 / globals.tickinterval
 
     
     local NodeToMoveTo = Path[#Path]
 
-    local local_player = EntityList.GetLocalPlayer()
-    local local_player_pos = local_player:GetEyePosition()
-    local local_weapon = local_player:GetActiveWeapon()
+    local local_player = entity.get_local_player()
+    local local_player_pos = local_player:get_eye_position()
+    local local_weapon = local_player:get_player_weapon()
 
-    if Aimbot_AutoReload_Switch:Get() and local_weapon and not local_weapon:IsReloading() then
-        local clip = local_weapon:GetProp("DT_BaseCombatWeapon", "m_iClip1")
-        local max_clip = local_weapon:GetMaxClip()
+    if Aimbot_AutoReload_Switch:get() and local_weapon and local_weapon:get_weapon_reload() == -1 then
+        local clip = local_weapon.m_iClip1
+        local max_clip_ptr = ffi.cast("int*",GetCSWeaponData(local_weapon,false) + 0x14)
 
-        local current_clip_percentage = clip / max_clip
+        if max_clip_ptr then
+            local max_clip = max_clip_ptr[0] -- iMaxClip1
 
-        if(current_clip_percentage < ( Aimbot_AutoReload:Get() / 100 ) ) then
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_RELOAD)
+            local current_clip_percentage = clip / max_clip
+
+            if(current_clip_percentage < ( Aimbot_AutoReload:get() / 100 ) ) then
+                cmd.buttons = bit.bor(cmd.buttons,buttons.IN_RELOAD)
+            end
         end
+        
     end
 
     
-    local local_aimpunch = Angle:MakeNewAngleFromNLVector(local_player:GetProp("m_aimPunchAngle"))
-    local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:GetFloat())
+    local local_aimpunch = Angle:MakeNewAngleFromNLVector(local_player.m_aimPunchAngle)
+    local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:float())
 
     local TargetPlayerAndHitbox = Aimbot__FindNearestPlayer(local_player)
 
     if TargetPlayerAndHitbox[1] ~= nil and TargetPlayerAndHitbox[2] ~= nil and Vector3D:IsValid(local_player_pos) then 
         TimeSinceLastSeenEnemy = 0
         BeMoreAccurate(cmd) -- When seen enemy,always try to be more accurate
-        if Aimbot_AutoScope_Switch:Get() and local_weapon and local_weapon:GetProp("m_zoomLevel") == 0 and local_weapon:IsSniper() and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+        if Aimbot_AutoScope_Switch:get() and local_weapon and local_weapon.m_zoomLevel == 0 and local_weapon:get_weapon_info().m_WeaponType == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
         end
 
-        local TargetHitbox = TargetPlayerAndHitbox[1]:GetHitboxCenter(TargetPlayerAndHitbox[2])
+        local TargetHitbox = TargetPlayerAndHitbox[1]:get_hitbox_position(TargetPlayerAndHitbox[2])
         
         if Vector3D:IsValid(TargetHitbox) then
             local AngleToTarget = Math:CalcAngle(local_player_pos,TargetHitbox)
@@ -2235,7 +2465,7 @@ local function Aimbot(cmd)
             end
         end
     else
-        if NodeToMoveTo and TimeSinceLastSeenEnemy > tickrate * TimeToMove:Get() then
+        if NodeToMoveTo and TimeSinceLastSeenEnemy > tickrate * TimeToMove:get() then
             if Vector3D:IsValid(NodeToMoveTo.area.m_center)then
                 local AngleToTarget = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
 
@@ -2249,8 +2479,7 @@ local function Aimbot(cmd)
         end
         -- LatestTargetAngle = Angle:MakeNewAngleFromNLAngle(EngineClient.GetViewAngles())
     end
-    
-    LatestAngle = Math:SmoothAngle(LatestAngle,LatestTargetAngle,Aimbot_Speed:Get(),Aimbot_Smoothing_Method:Get(),Aimbot_Randomize_Speed:Get())
+    LatestAngle = Math:SmoothAngle(LatestAngle,LatestTargetAngle,Aimbot_Speed:get(),GetIndexFromSelectedCombo(Aimbot_Smoothing_Method_Combo_Table,Aimbot_Smoothing_Method:get()),Aimbot_Randomize_Speed:get())
     -- LatestAngle:PrintValueClean()
     LatestAngle:NormalizeTo180()
     
@@ -2259,40 +2488,40 @@ local function Aimbot(cmd)
     --     cmd.buttons = bit.bor(cmd.buttons,1)
     -- end
     
-    cmd.viewangles.pitch = LatestAngle.x
-    cmd.viewangles.yaw = LatestAngle.y
+    cmd.view_angles.x = LatestAngle.x
+    cmd.view_angles.y = LatestAngle.y
     
-    local Hitchance_Method = Aimbot_Hitchance_Method:Get()
+    local Hitchance_Method = GetIndexFromSelectedCombo(Aimbot_Hitchance_Method_Combo_Table,Aimbot_Hitchance_Method:get())
 
     if Hitchance_Method == 1 then
-        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchancePrecomputed(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
-            if Aimbot_Enforce_Hitbox:Get() then
-                cmd.viewangles.pitch = LatestTargetAngle.x
-                cmd.viewangles.yaw = LatestTargetAngle.y
+        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLVector(cmd.view_angles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchancePrecomputed(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            if Aimbot_Enforce_Hitbox:get() then
+                cmd.view_angles.x = LatestTargetAngle.x
+                cmd.view_angles.y = LatestTargetAngle.y
             end
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
         end
     elseif Hitchance_Method == 2 then
-        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceRandom(cmd,LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
-            if Aimbot_Enforce_Hitbox:Get() then
-                cmd.viewangles.pitch = LatestTargetAngle.x
-                cmd.viewangles.yaw = LatestTargetAngle.y
+        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLVector(cmd.view_angles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceRandom(cmd,LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            if Aimbot_Enforce_Hitbox:get() then
+                cmd.view_angles.x = LatestTargetAngle.x
+                cmd.view_angles.y = LatestTargetAngle.y
             end
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
         end
     else
-        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLAngle(cmd.viewangles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceUniform(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
-            if Aimbot_Enforce_Hitbox:Get() then
-                cmd.viewangles.pitch = LatestTargetAngle.x
-                cmd.viewangles.yaw = LatestTargetAngle.y
+        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:MakeNewAngleFromNLVector(cmd.view_angles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceUniform(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            if Aimbot_Enforce_Hitbox:get() then
+                cmd.view_angles.x = LatestTargetAngle.x
+                cmd.view_angles.y = LatestTargetAngle.y
             end
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
         end
     end
     
 
-    if (TimeSinceLastSeenEnemy > tickrate * TimeToMove:Get()) then
-        if Aimbot_AutoUnscope_Switch:Get() and local_weapon and local_weapon:GetProp("m_zoomLevel") ~= 0 and bit.band(cmd.buttons,buttons.IN_ATTACK) == 0 then 
+    if (TimeSinceLastSeenEnemy > tickrate * TimeToMove:get()) then
+        if Aimbot_AutoUnscope_Switch:get() and local_weapon and local_weapon.m_zoomLevel ~= 0 and bit.band(cmd.buttons,buttons.IN_ATTACK) == 0 then 
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
         end
     else
@@ -2368,67 +2597,61 @@ PrecomputeSeed()
 local LastMapName = nil
 -- local ShouldStop = false
 
-Cheat.RegisterCallback("pre_prediction", function(cmd)
-
+events.createmove:set(function(cmd)
+    
     if ( bit.band(cmd.buttons,buttons.IN_ATTACK,buttons.IN_ATTACK2) ~= 0 ) then
         return
     end
 
-    local tickrate = 1.0 / GlobalVars.interval_per_tick
+    local tickrate = 1.0 / globals.tickinterval
    --FindPath()
-    local game_rules = EntityList.GetGameRules()
-    local m_bWarmupPeriod = game_rules:GetProp("m_bWarmupPeriod")
-    local m_bFreezePeriod = game_rules:GetProp("m_bFreezePeriod")
+    local game_rules = entity.get_game_rules()
+    local m_bWarmupPeriod = game_rules.m_bWarmupPeriod
+    local m_bFreezePeriod = game_rules.m_bFreezePeriod
     -- local m_bIsValveDS = game_rules:GetProp("m_bIsValveDS")
 
-    local player_resource = EntityList.GetPlayerResource()
-    local m_iPlayerC4 = player_resource:GetProp("m_iPlayerC4")
+    
 
-    local entity = EntityList.GetClientEntity(EngineClient.GetLocalPlayer())
-    local player = entity:GetPlayer()
-    local active_weapon = player:GetActiveWeapon()
+    -- local entity = EntityList.GetClientEntity(EngineClient.GetLocalPlayer())
+    local player = entity.get_local_player()
+    local active_weapon = player:get_player_weapon()
 
-    if not(entity or player or player:IsAlive())then
+    local player_resource = player:get_resource()
+    local m_iPlayerC4 = player_resource.m_iPlayerC4
+
+    if not(player or player:is_alive())then
         return
     end
 
     local slot_string = nil
     local weapon_level = 0
-    if GlobalVars.tickcount % tickrate == 0 then 
-        if (m_iPlayerC4 == player:EntIndex()) then
-            if(active_weapon:GetClassId() == 34)then
-                EngineClient.ExecuteClientCmd("drop")
+    if globals.tickcount % tickrate == 0 then 
+        if (m_iPlayerC4 == player:get_index()) then
+            if(active_weapon:get_classid() == 34)then
+                utils.console_exec("drop;")
             else
-                EngineClient.ExecuteClientCmd("slot5")
+                utils.console_exec("slot5;")
             end
         else
-            if AutoWeaponSwitch_Switch:Get() then 
+            if AutoWeaponSwitch_Switch:get() then 
                 -- print("Auto Weapon Switch Start")
                 -- print(" ")
-                local weapon_list = player:GetProp("m_hMyWeapons")
-                for _,handle in ipairs(weapon_list)do
-                    if handle == -1 then 
-                        -- print("Invalid handle")
-                        goto continue 
-                    end
-                    local weapon_entity = EntityList.GetWeaponFromHandle(handle)
+                local weapon_list = player:get_player_weapon(true)
+                for _,weapon_entity in ipairs(weapon_list)do
+                    local weapon_type_ptr = ffi.cast("int*",GetCSWeaponData(weapon_entity,true) + 0xC8)
+                    if not weapon_type_ptr then goto continue end
                     
-
-                    if not weapon_entity or not weapon_entity:IsWeapon() then 
-                        goto continue 
-                    end
-                    local weapon = weapon_entity:GetWeapon()
-
-
-                    if (weapon:IsRifle() or weapon:IsSniper()) and ( weapon_level < 3 ) then
+                    local weapon_type = weapon_type_ptr[0]
+                    if not weapon_type then goto continue end
+                    if (weapon_type == CSWeaponType.WEAPONTYPE_RIFLE or weapon_type == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE) and ( weapon_level < 3 ) then
                         slot_string = "slot1"
                         weapon_level = 3
                         -- print("Changing to rifle/sniper")
-                    elseif weapon:IsPistol() and ( weapon_level < 2 ) then
+                    elseif weapon_type == CSWeaponType.WEAPONTYPE_PISTOL and ( weapon_level < 2 ) then
                         slot_string = "slot2"
                         weapon_level = 2
                         -- print("Changing to pistol")
-                    elseif weapon:IsKnife() and ( weapon_level < 1 )then
+                    elseif weapon_type == CSWeaponType.WEAPONTYPE_KNIFE and ( weapon_level < 1 )then
                         slot_string = "slot3"
                         weapon_level = 1
                         -- print("Changing to knife")
@@ -2437,7 +2660,7 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
                     ::continue::
                 end
                 if slot_string ~= nil then
-                    EngineClient.ExecuteClientCmd(slot_string)
+                    utils.console_exec(slot_string)
                 end
                 -- print("Auto Weapon Switch End")
                 -- print(" ")
@@ -2447,8 +2670,8 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
   
     
 
-    if (GlobalVars.tickcount % tickrate == 0) then
-        if (EngineClient.GetLevelNameShort() ~= LastMapName) then
+    if (globals.tickcount % tickrate == 0) then
+        if (common.get_map_data().shortname ~= LastMapName) then
             print("Map changed.")
             INavFile.m_isLoaded = false
             TriggerPrepareToFindAnotherNode()
@@ -2456,17 +2679,15 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
     end
 
     if (not INavFile.m_isLoaded) then
-        print("LoadMap : " .. EngineClient.GetLevelNameShort())
-        LoadMap(EngineClient.GetLevelNameShort())
-        LastMapName = EngineClient.GetLevelNameShort()
+        print("LoadMap : " .. common.get_map_data().shortname)
+        LoadMap(common.get_map_data().shortname)
+        LastMapName = common.get_map_data().shortname
         return
     end
 
-    if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not(GlobalVars.m_bRemoteClient and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
+    if globals.tickcount % 1 == 0 and INavFile.m_isLoaded and not( m_bRemoteClient() and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
         --print("Iteration : ",iteration)
-        if not m_bFreezePeriod then 
-
-
+        if not m_bFreezePeriod  then 
             if(#Path == 0) then
                 if (#OpenList == 0) then
                     --print("PATH 0")
@@ -2480,15 +2701,14 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
             else
                 --print("ELSE PATH 0")
                 MoveToTarget(cmd)
-                if TimeSinceLastSeenEnemy > tickrate * TimeToMove:Get() then
+                if TimeSinceLastSeenEnemy > tickrate * TimeToMove:get() then
                     ObstacleAvoid(cmd)
                 end
                 CheckIfArrivedAtNode(cmd)
             end
-        end
-        
-        if (bit.band(cmd.buttons,buttons.IN_ATTACK) == 0)then 
-            Aimbot(cmd)
+            if (bit.band(cmd.buttons,buttons.IN_ATTACK) == 0)then 
+                Aimbot(cmd)
+            end
         end
         -- print("TimeSinceLastSeenEnemy : ",TimeSinceLastSeenEnemy)
     end
@@ -2505,16 +2725,162 @@ Cheat.RegisterCallback("pre_prediction", function(cmd)
     cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
     cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
 
-    cmd.viewangles.pitch = Math:Clamp(cmd.viewangles.pitch ,-89,89)
-    cmd.viewangles.yaw = Math:Clamp(cmd.viewangles.yaw ,-180,180)
-    cmd.viewangles.roll = 0.0
-    if not Aimbot_SilentAim:Get() then
-        EngineClient.SetViewAngles(cmd.viewangles)
+    cmd.view_angles.x = Math:Clamp(cmd.view_angles.x ,-89,89)
+    cmd.view_angles.y = Math:Clamp(cmd.view_angles.y ,-180,180)
+    cmd.view_angles.z = 0.0
+    if not Aimbot_SilentAim:get() then
+        render.camera_angles(cmd.view_angles)
     end
+
 end)
 
+-- Cheat.RegisterCallback("pre_prediction", function(cmd)
 
-local AutoQueuePanorama = Panorama.LoadString([[
+--     if ( bit.band(cmd.buttons,buttons.IN_ATTACK,buttons.IN_ATTACK2) ~= 0 ) then
+--         return
+--     end
+
+--     local tickrate = 1.0 / GlobalVars.interval_per_tick
+--    --FindPath()
+--     local game_rules = EntityList.GetGameRules()
+--     local m_bWarmupPeriod = game_rules:GetProp("m_bWarmupPeriod")
+--     local m_bFreezePeriod = game_rules:GetProp("m_bFreezePeriod")
+--     -- local m_bIsValveDS = game_rules:GetProp("m_bIsValveDS")
+
+--     local player_resource = EntityList.GetPlayerResource()
+--     local m_iPlayerC4 = player_resource:GetProp("m_iPlayerC4")
+
+--     local entity = EntityList.GetClientEntity(EngineClient.GetLocalPlayer())
+--     local player = entity:GetPlayer()
+--     local active_weapon = player:GetActiveWeapon()
+
+--     if not(entity or player or player:IsAlive())then
+--         return
+--     end
+
+--     local slot_string = nil
+--     local weapon_level = 0
+--     if GlobalVars.tickcount % tickrate == 0 then 
+--         if (m_iPlayerC4 == player:EntIndex()) then
+--             if(active_weapon:GetClassId() == 34)then
+--                 EngineClient.ExecuteClientCmd("drop")
+--             else
+--                 EngineClient.ExecuteClientCmd("slot5")
+--             end
+--         else
+--             if AutoWeaponSwitch_Switch:Get() then 
+--                 -- print("Auto Weapon Switch Start")
+--                 -- print(" ")
+--                 local weapon_list = player:GetProp("m_hMyWeapons")
+--                 for _,handle in ipairs(weapon_list)do
+--                     if handle == -1 then 
+--                         -- print("Invalid handle")
+--                         goto continue 
+--                     end
+--                     local weapon_entity = EntityList.GetWeaponFromHandle(handle)
+                    
+
+--                     if not weapon_entity or not weapon_entity:IsWeapon() then 
+--                         goto continue 
+--                     end
+--                     local weapon = weapon_entity:GetWeapon()
+
+
+--                     if (weapon:IsRifle() or weapon:IsSniper()) and ( weapon_level < 3 ) then
+--                         slot_string = "slot1"
+--                         weapon_level = 3
+--                         -- print("Changing to rifle/sniper")
+--                     elseif weapon:IsPistol() and ( weapon_level < 2 ) then
+--                         slot_string = "slot2"
+--                         weapon_level = 2
+--                         -- print("Changing to pistol")
+--                     elseif weapon:IsKnife() and ( weapon_level < 1 )then
+--                         slot_string = "slot3"
+--                         weapon_level = 1
+--                         -- print("Changing to knife")
+--                     end
+                    
+--                     ::continue::
+--                 end
+--                 if slot_string ~= nil then
+--                     EngineClient.ExecuteClientCmd(slot_string)
+--                 end
+--                 -- print("Auto Weapon Switch End")
+--                 -- print(" ")
+--             end
+--         end
+--     end
+  
+    
+
+--     if (GlobalVars.tickcount % tickrate == 0) then
+--         if (EngineClient.GetLevelNameShort() ~= LastMapName) then
+--             print("Map changed.")
+--             INavFile.m_isLoaded = false
+--             TriggerPrepareToFindAnotherNode()
+--         end
+--     end
+
+--     if (not INavFile.m_isLoaded) then
+--         print("LoadMap : " .. EngineClient.GetLevelNameShort())
+--         LoadMap(EngineClient.GetLevelNameShort())
+--         LastMapName = EngineClient.GetLevelNameShort()
+--         return
+--     end
+
+--     if GlobalVars.tickcount % 1 == 0 and INavFile.m_isLoaded and not(GlobalVars.m_bRemoteClient and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
+--         --print("Iteration : ",iteration)
+--         if not m_bFreezePeriod then 
+
+
+--             if(#Path == 0) then
+--                 if (#OpenList == 0) then
+--                     --print("PATH 0")
+--                     PrepareToFindAnotherNode()
+--                 else
+--                     FindPath()
+--                     cmd.forwardmove = 0.0
+--                     cmd.sidemove = 0.0
+--                     cmd.upmove = 0.0
+--                 end
+--             else
+--                 --print("ELSE PATH 0")
+--                 MoveToTarget(cmd)
+--                 if TimeSinceLastSeenEnemy > tickrate * TimeToMove:Get() then
+--                     ObstacleAvoid(cmd)
+--                 end
+--                 CheckIfArrivedAtNode(cmd)
+--             end
+--         end
+        
+--         if (bit.band(cmd.buttons,buttons.IN_ATTACK) == 0)then 
+--             Aimbot(cmd)
+--         end
+--         -- print("TimeSinceLastSeenEnemy : ",TimeSinceLastSeenEnemy)
+--     end
+
+--     TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
+--     -- FixMovement(EngineClient.GetViewAngles(),cmd,cmd.forwardmove,cmd.sidemove)
+--     -- print("Clamping")
+
+--     -- Prevent IN_ATTACK and IN_ATTACK2 in same tick
+--     if ( bit.band(cmd.buttons,buttons.IN_ATTACK,buttons.IN_ATTACK2) ~= 0 ) then
+--         cmd.buttons = bit.band(cmd.buttons,bit.bnot(buttons.IN_ATTACK)) -- dont shoot,prioritize scoping first
+--     end
+
+--     cmd.forwardmove = Math:Clamp(cmd.forwardmove,-450,450)
+--     cmd.sidemove = Math:Clamp(cmd.sidemove,-450,450)
+
+--     cmd.viewangles.pitch = Math:Clamp(cmd.viewangles.pitch ,-89,89)
+--     cmd.viewangles.yaw = Math:Clamp(cmd.viewangles.yaw ,-180,180)
+--     cmd.viewangles.roll = 0.0
+--     if not Aimbot_SilentAim:Get() then
+--         EngineClient.SetViewAngles(cmd.viewangles)
+--     end
+-- end)
+
+
+local AutoQueuePanorama = panorama.loadstring([[
     function queueMatchmaking() 
         {
             if (!LobbyAPI.BIsHost()) 
@@ -2542,10 +2908,10 @@ local AutoQueuePanorama = Panorama.LoadString([[
     
         queueMatchmaking();	
 ]])
-local panorama = Panorama.Open()
+-- local panorama = Panorama.Open()
 
 local function AutoQueue()
-    if(AutoQueue_Switch:Get() and not IsDrawingLoadingImage() and not IsClientLocalToActiveServer() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
+    if(AutoQueue_Switch:get() and not IsDrawingLoadingImage() and not IsClientLocalToActiveServer() and not globals.is_connected and not globals.is_in_game and GetGameState() == 3 and GetSignOnState() == 0) then
         AutoQueuePanorama()
         
         -- if ( not panorama.LobbyAPI.BIsHost()) then
@@ -2562,7 +2928,7 @@ end
 local AlreadyAttemptedToReconnect = false
 local function AutoReconnect()
     if not AlreadyAttemptedToReconnect then
-        if(AutoReconnect_Switch:Get() and not IsDrawingLoadingImage() and not IsClientLocalToActiveServer() and not EngineClient.IsConnected() and not EngineClient.IsInGame() and GetGameState() == 3 and GetSignOnState() == 0) then
+        if(AutoReconnect_Switch:get() and not IsDrawingLoadingImage() and not IsClientLocalToActiveServer() and not globals.is_connected and not globals.is_in_game and GetGameState() == 3 and GetSignOnState() == 0) then
             if (panorama.CompetitiveMatchAPI.HasOngoingMatch() and not panorama.GameStateAPI.IsConnectedOrConnectingToServer() ) then
                 panorama.CompetitiveMatchAPI.ActionReconnectToOngoingMatch()
                 AlreadyAttemptedToReconnect = true
@@ -2571,176 +2937,284 @@ local function AutoReconnect()
         end
     end
 end
-Cheat.RegisterCallback("frame_stage", function(stage)
-    if stage ~= 6 then return end
-    local tickrate = 1.0 / GlobalVars.interval_per_tick
-    if( GlobalVars.tickcount % tickrate * 5 == 0 ) then
+events.post_render:set(function()
+    local tickrate = 1.0 / globals.tickinterval
+    if( globals.tickcount % tickrate * 5 == 0 ) then
         AutoReconnect()
         AutoQueue()
     end
-    
 end)
-
-Cheat.RegisterCallback("draw", function()
-
-    -- print(GetGameState())
-    -- print(IsDrawingLoadingImage())
-    -- print(IsDrawingLoadingImage())
-    -- local m_bShowProgressDialog = ffi.cast("bool*",g_EngineVGUI + 0x58)[0]
-    -- print(m_bShowProgressDialog)
-    -- print(IsTransitioningToLoad())  
-    -- if scr_disabled_for_loading[0] == true then 
-    --     print("scr_disabled_for_loading :::::::::::::::: " , scr_disabled_for_loading[0])
-    -- end
+-- Cheat.RegisterCallback("frame_stage", function(stage)
+--     if stage ~= 6 then return end
+--     local tickrate = 1.0 / GlobalVars.interval_per_tick
+--     if( GlobalVars.tickcount % tickrate * 5 == 0 ) then
+--         AutoReconnect()
+--         AutoQueue()
+--     end
     
-    -- print(IsClientLocalToActiveServer())
-    -- if math.ceil(GlobalVars.curtime) % 2 == 0 then 
-    -- AutoReconnect()
-    -- AutoQueue()
-    -- end
-    
-    
-    --print(#Path)
-    if #Path == 0 then
-        --if(CurrentNode ~= nil)then
-        --    local CurrentNodePosition = CurrentNode.area.m_center
-        --    local NeverLose_Vector = Vector.new(CurrentNodePosition.x, CurrentNodePosition.y, CurrentNodePosition.z)
-        --    Render.Circle3D(NeverLose_Vector, 10.0, 10.0, Color.new(1.0, 1.0, 1.0))
-        --    Render.Text("Current Node", Render.WorldToScreen(NeverLose_Vector), Color.new(1.0, 1.0, 1.0, 1.0), 20)
-        --end
+-- end)
+events.render:set(
+    function()
 
-        if(CurrentNode ~= nil) then
-            local localPath = {}
-            table.insert(localPath,CurrentNode)
-            local ParentNode = CurrentNode.parent
-            while ParentNode ~= StartingNode do
+        -- print(GetGameState())
+        -- print(IsDrawingLoadingImage())
+        -- print(IsDrawingLoadingImage())
+        -- local m_bShowProgressDialog = ffi.cast("bool*",g_EngineVGUI + 0x58)[0]
+        -- print(m_bShowProgressDialog)
+        -- print(IsTransitioningToLoad())  
+        -- if scr_disabled_for_loading[0] == true then 
+        --     print("scr_disabled_for_loading :::::::::::::::: " , scr_disabled_for_loading[0])
+        -- end
+        
+        -- print(IsClientLocalToActiveServer())
+        -- if math.ceil(GlobalVars.curtime) % 2 == 0 then 
+        -- AutoReconnect()
+        -- AutoQueue()
+        -- end
+        
+        
+        --print(#Path)
+        if #Path == 0 then
+            --if(CurrentNode ~= nil)then
+            --    local CurrentNodePosition = CurrentNode.area.m_center
+            --    local NeverLose_Vector = Vector.new(CurrentNodePosition.x, CurrentNodePosition.y, CurrentNodePosition.z)
+            --    Render.Circle3D(NeverLose_Vector, 10.0, 10.0, Color.new(1.0, 1.0, 1.0))
+            --    Render.Text("Current Node", Render.WorldToScreen(NeverLose_Vector), Color.new(1.0, 1.0, 1.0, 1.0), 20)
+            --end
+    
+            if(CurrentNode ~= nil) then
+                local localPath = {}
+                table.insert(localPath,CurrentNode)
+                local ParentNode = CurrentNode.parent
+                while ParentNode ~= StartingNode do
+                    table.insert(localPath,ParentNode)
+                    ParentNode = ParentNode.parent
+                end
                 table.insert(localPath,ParentNode)
-                ParentNode = ParentNode.parent
+    
+                for i = 1,#localPath do
+                    local FirstNode = localPath[i]
+                    local FirstNodePosition = FirstNode.area.m_center
+                    local FirstNodeVector = vector(FirstNodePosition.x, FirstNodePosition.y, FirstNodePosition.z)
+                    local FirstNodeScreenPos = render.world_to_screen(FirstNodeVector)
+    
+                    local SecondNode = localPath[i+1]
+                    if(SecondNode ~= nil)then
+                        local SecondNodePosition = SecondNode.area.m_center
+                        local SecondNodeVector = vector(SecondNodePosition.x, SecondNodePosition.y, SecondNodePosition.z)
+                        local SecondNodeScreenPos = render.world_to_screen(SecondNodeVector)
+                        
+                        render.line(FirstNodeScreenPos, SecondNodeScreenPos,color(255,0,0,255))
+                        -- Render.Line(FirstNodeScreenPos, SecondNodeScreenPos, Color.new(1.0, 1.0, 1.0, 1.0))
+                    end
+    
+                end
             end
-            table.insert(localPath,ParentNode)
-
-            for i = 1,#localPath do
-                local FirstNode = localPath[i]
+    
+            --for key,Node in ipairs(OpenList)do
+            --    local NodePosition = Node.area.m_center
+            --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(0.0, 1.0, 0.0))
+            --end
+            --
+            --for key,Node in ipairs(ClosedList)do
+            --    local NodePosition = Node.area.m_center
+            --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(1.0, 0.0, 0.0))
+            --end
+        else
+            for i = 1,#Path do
+                local FirstNode = Path[i]
                 local FirstNodePosition = FirstNode.area.m_center
-                local FirstNodeVector = Vector.new(FirstNodePosition.x, FirstNodePosition.y, FirstNodePosition.z)
-                local FirstNodeScreenPos = Render.WorldToScreen(FirstNodeVector)
-
-                local SecondNode = localPath[i+1]
+                local FirstNodeVector = vector(FirstNodePosition.x, FirstNodePosition.y, FirstNodePosition.z)
+                local FirstNodeScreenPos = render.world_to_screen(FirstNodeVector)
+    
+                local SecondNode = Path[i+1]
                 if(SecondNode ~= nil)then
                     local SecondNodePosition = SecondNode.area.m_center
-                    local SecondNodeVector = Vector.new(SecondNodePosition.x, SecondNodePosition.y, SecondNodePosition.z)
-                    local SecondNodeScreenPos = Render.WorldToScreen(SecondNodeVector)
-                    Render.Line(FirstNodeScreenPos, SecondNodeScreenPos, Color.new(1.0, 1.0, 1.0, 1.0))
+                    local SecondNodeVector = vector(SecondNodePosition.x, SecondNodePosition.y, SecondNodePosition.z)
+                    local SecondNodeScreenPos = render.world_to_screen(SecondNodeVector)
+                    render.line(FirstNodeScreenPos, SecondNodeScreenPos,color(0,255,0,255))
                 end
-
             end
+            --for key,Node in ipairs(Path)do
+            --    local NodePosition = Node.area.m_center
+            --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(1.0, 1.0, 1.0))
+            --end
         end
+end)
 
-        --for key,Node in ipairs(OpenList)do
-        --    local NodePosition = Node.area.m_center
-        --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(0.0, 1.0, 0.0))
-        --end
-        --
-        --for key,Node in ipairs(ClosedList)do
-        --    local NodePosition = Node.area.m_center
-        --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(1.0, 0.0, 0.0))
-        --end
-    else
-        for i = 1,#Path do
-            local FirstNode = Path[i]
-            local FirstNodePosition = FirstNode.area.m_center
-            local FirstNodeVector = Vector.new(FirstNodePosition.x, FirstNodePosition.y, FirstNodePosition.z)
-            local FirstNodeScreenPos = Render.WorldToScreen(FirstNodeVector)
+-- Cheat.RegisterCallback("draw", function()
 
-            local SecondNode = Path[i+1]
-            if(SecondNode ~= nil)then
-                local SecondNodePosition = SecondNode.area.m_center
-                local SecondNodeVector = Vector.new(SecondNodePosition.x, SecondNodePosition.y, SecondNodePosition.z)
-                local SecondNodeScreenPos = Render.WorldToScreen(SecondNodeVector)
-                Render.Line(FirstNodeScreenPos, SecondNodeScreenPos, Color.new(1.0, 1.0, 1.0, 1.0))
-            end
-        end
-        --for key,Node in ipairs(Path)do
-        --    local NodePosition = Node.area.m_center
-        --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(1.0, 1.0, 1.0))
-        --end
+--     -- print(GetGameState())
+--     -- print(IsDrawingLoadingImage())
+--     -- print(IsDrawingLoadingImage())
+--     -- local m_bShowProgressDialog = ffi.cast("bool*",g_EngineVGUI + 0x58)[0]
+--     -- print(m_bShowProgressDialog)
+--     -- print(IsTransitioningToLoad())  
+--     -- if scr_disabled_for_loading[0] == true then 
+--     --     print("scr_disabled_for_loading :::::::::::::::: " , scr_disabled_for_loading[0])
+--     -- end
+    
+--     -- print(IsClientLocalToActiveServer())
+--     -- if math.ceil(GlobalVars.curtime) % 2 == 0 then 
+--     -- AutoReconnect()
+--     -- AutoQueue()
+--     -- end
+    
+    
+--     --print(#Path)
+--     if #Path == 0 then
+--         --if(CurrentNode ~= nil)then
+--         --    local CurrentNodePosition = CurrentNode.area.m_center
+--         --    local NeverLose_Vector = Vector.new(CurrentNodePosition.x, CurrentNodePosition.y, CurrentNodePosition.z)
+--         --    Render.Circle3D(NeverLose_Vector, 10.0, 10.0, Color.new(1.0, 1.0, 1.0))
+--         --    Render.Text("Current Node", Render.WorldToScreen(NeverLose_Vector), Color.new(1.0, 1.0, 1.0, 1.0), 20)
+--         --end
+
+--         if(CurrentNode ~= nil) then
+--             local localPath = {}
+--             table.insert(localPath,CurrentNode)
+--             local ParentNode = CurrentNode.parent
+--             while ParentNode ~= StartingNode do
+--                 table.insert(localPath,ParentNode)
+--                 ParentNode = ParentNode.parent
+--             end
+--             table.insert(localPath,ParentNode)
+
+--             for i = 1,#localPath do
+--                 local FirstNode = localPath[i]
+--                 local FirstNodePosition = FirstNode.area.m_center
+--                 local FirstNodeVector = Vector.new(FirstNodePosition.x, FirstNodePosition.y, FirstNodePosition.z)
+--                 local FirstNodeScreenPos = Render.WorldToScreen(FirstNodeVector)
+
+--                 local SecondNode = localPath[i+1]
+--                 if(SecondNode ~= nil)then
+--                     local SecondNodePosition = SecondNode.area.m_center
+--                     local SecondNodeVector = Vector.new(SecondNodePosition.x, SecondNodePosition.y, SecondNodePosition.z)
+--                     local SecondNodeScreenPos = Render.WorldToScreen(SecondNodeVector)
+--                     Render.Line(FirstNodeScreenPos, SecondNodeScreenPos, Color.new(1.0, 1.0, 1.0, 1.0))
+--                 end
+
+--             end
+--         end
+
+--         --for key,Node in ipairs(OpenList)do
+--         --    local NodePosition = Node.area.m_center
+--         --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(0.0, 1.0, 0.0))
+--         --end
+--         --
+--         --for key,Node in ipairs(ClosedList)do
+--         --    local NodePosition = Node.area.m_center
+--         --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(1.0, 0.0, 0.0))
+--         --end
+--     else
+--         for i = 1,#Path do
+--             local FirstNode = Path[i]
+--             local FirstNodePosition = FirstNode.area.m_center
+--             local FirstNodeVector = Vector.new(FirstNodePosition.x, FirstNodePosition.y, FirstNodePosition.z)
+--             local FirstNodeScreenPos = Render.WorldToScreen(FirstNodeVector)
+
+--             local SecondNode = Path[i+1]
+--             if(SecondNode ~= nil)then
+--                 local SecondNodePosition = SecondNode.area.m_center
+--                 local SecondNodeVector = Vector.new(SecondNodePosition.x, SecondNodePosition.y, SecondNodePosition.z)
+--                 local SecondNodeScreenPos = Render.WorldToScreen(SecondNodeVector)
+--                 Render.Line(FirstNodeScreenPos, SecondNodeScreenPos, Color.new(1.0, 1.0, 1.0, 1.0))
+--             end
+--         end
+--         --for key,Node in ipairs(Path)do
+--         --    local NodePosition = Node.area.m_center
+--         --    Render.Circle3D(Vector.new(NodePosition.x, NodePosition.y, NodePosition.z), 10.0, 10.0, Color.new(1.0, 1.0, 1.0))
+--         --end
+--     end
+-- end)
+
+events.cs_win_panel_match:set(function(event)
+    if AutoDisconnect_Switch:get() then
+        utils.console_exec("disconnect;")
     end
 end)
 
-Cheat.RegisterCallback("events", function(event)
-    local tickrate = 1.0 / GlobalVars.interval_per_tick
-    -- print(event:GetName())
+events.cs_game_disconnected:set(function(event)
+    AlreadyAttemptedToReconnect = false
+    INavFile.m_isLoaded = false
+    TriggerPrepareToFindAnotherNode()
 
-    -- if (event:GetName() == "round_prestart") then
-    --     ShouldStop = true
-    --     goto continue
-	-- end
- 
-    -- if (event:GetName() == "round_end") then
-    --     IsWarmup = false
-    --     goto continue
-    -- end
+end)
 
-	-- if (event:GetName() == "round_freeze_end") then
-	-- 	ShouldStop = false
-    --     goto continue
-    -- end
- 
-	-- if (event:GetName() == "round_end") then
-	-- 	ShouldStop = true
-    --     goto continue
-    -- end
-    if (event:GetName() == "cs_win_panel_match") and (AutoDisconnect_Switch:Get() or false) then
-        EngineClient.ExecuteClientCmd("disconnect")
-        goto continue
+events.player_spawn:set(function(event)
+    
+    local local_player = entity.get_local_player()
+    if local_player == nil then
+        return
     end
-    if (event:GetName() == "cs_game_disconnected") then
-        -- print("cs_game_disconnected")
-
-        AlreadyAttemptedToReconnect = false
-
-        INavFile.m_isLoaded = false
+    local player_info = local_player:get_player_info()
+    local UserID = player_info.userid
+    if (event.userid == UserID) then
+        local tickrate = 1.0 / globals.tickinterval
+        TimeSinceLastSeenEnemy = tickrate * TimeToMove:get()
         TriggerPrepareToFindAnotherNode()
-        goto continue
-    end
-    if (event:GetName() == "player_spawn") then
-        local local_player = EntityList.GetLocalPlayer()
-        if local_player == nil then
-            return
+        if AutoBuy_Switch:get() then
+            AutoBuy()
         end
-        local player_info = local_player:GetPlayerInfo()
-        local UserID = player_info.userId
-        if (event:GetInt("userid", -1) == UserID) then
-            TimeSinceLastSeenEnemy = tickrate * TimeToMove:Get()
-            TriggerPrepareToFindAnotherNode()
-            if AutoBuy_Switch:Get() then
-                buyWeapon(AutoBuy_PrimaryWeapon, primaryWeapons)
-                buyWeapon(AutoBuy_SecondaryWeapon, secondaryWeapons)
-                local armorSelected = AutoBuy_Armor:Get()
-                local armorTable = armors[armorSelected + 1]
-                buyTable({ armorTable[2], armorTable[3] })
-                if (AutoBuy_Defuser_Switch:Get()) then
-                    buy('defuser')
-                end
-                if (AutoBuy_Taser_Switch:Get()) then
-                    buy('taser')
-                buyGrenades({ AutoBuy_Grenade_Slot1, AutoBuy_Grenade_Slot2, AutoBuy_Grenade_Slot3, AutoBuy_Grenade_Slot4 })
-                end
-            end
-            
-        end
-    -- elseif (event:GetName() == "nextlevel_changed")then
-    --     print("nextlevel_changed")
-    --     INavFile.m_isLoaded = false
-    --     OpenList = { }
-    --     ClosedList = { }
-    --     CurrentNode = nil
-    --     Path = { }
-    --     NeedToResetLists = true
-        goto continue
+        
     end
-    ::continue::
+
 end)
+
+-- Cheat.RegisterCallback("events", function(event)
+--     local tickrate = 1.0 / GlobalVars.interval_per_tick
+
+--     if (event:GetName() == "cs_win_panel_match") and (AutoDisconnect_Switch:Get() or false) then
+--         EngineClient.ExecuteClientCmd("disconnect")
+--         goto continue
+--     end
+--     if (event:GetName() == "cs_game_disconnected") then
+--         -- print("cs_game_disconnected")
+
+--         AlreadyAttemptedToReconnect = false
+
+--         INavFile.m_isLoaded = false
+--         TriggerPrepareToFindAnotherNode()
+--         goto continue
+--     end
+--     if (event:GetName() == "player_spawn") then
+--         local local_player = EntityList.GetLocalPlayer()
+--         if local_player == nil then
+--             return
+--         end
+--         local player_info = local_player:GetPlayerInfo()
+--         local UserID = player_info.userId
+--         if (event:GetInt("userid", -1) == UserID) then
+--             TimeSinceLastSeenEnemy = tickrate * TimeToMove:Get()
+--             TriggerPrepareToFindAnotherNode()
+--             if AutoBuy_Switch:Get() then
+--                 buyWeapon(AutoBuy_PrimaryWeapon, primaryWeapons)
+--                 buyWeapon(AutoBuy_SecondaryWeapon, secondaryWeapons)
+--                 local armorSelected = AutoBuy_Armor:Get()
+--                 local armorTable = armors[armorSelected + 1]
+--                 buyTable({ armorTable[2], armorTable[3] })
+--                 if (AutoBuy_Defuser_Switch:Get()) then
+--                     buy('defuser')
+--                 end
+--                 if (AutoBuy_Taser_Switch:Get()) then
+--                     buy('taser')
+--                 buyGrenades({ AutoBuy_Grenade_Slot1, AutoBuy_Grenade_Slot2, AutoBuy_Grenade_Slot3, AutoBuy_Grenade_Slot4 })
+--                 end
+--             end
+            
+--         end
+--     -- elseif (event:GetName() == "nextlevel_changed")then
+--     --     print("nextlevel_changed")
+--     --     INavFile.m_isLoaded = false
+--     --     OpenList = { }
+--     --     ClosedList = { }
+--     --     CurrentNode = nil
+--     --     Path = { }
+--     --     NeedToResetLists = true
+--         goto continue
+--     end
+--     ::continue::
+-- end)
 
 
 
