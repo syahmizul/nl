@@ -318,8 +318,11 @@ local function GetCSWeaponData(weapon,multiple)
     -- else
     --     return GetWeaponData(weapon.m_iItemDefinitionIndex)
     -- end
-    return GetWeaponData(weapon.m_iItemDefinitionIndex)
-    
+    if weapon then 
+        return GetWeaponData(weapon.m_iItemDefinitionIndex)
+    else
+        return nil
+    end    
 end
 
 local g_GlobalVars = ffi.cast("uint32_t**",utils.opcode_scan("client.dll","A1 ? ? ? ? 5E 8B 40 10",1))[0][0]
@@ -2122,8 +2125,8 @@ local function PrecomputeSeed()
 end
 
 local function CalculateSpread(weapon,seed,inaccuracy,spread,UsePrecomputedSeeds,cmdSeed)
-    if not weapon or weapon:GetProp("m_iClip1") == 0 then
-        return Vector3D:new()
+    if not weapon or weapon.m_iClip1 == 0 then
+        return vector(0.00,0.00,0.00)
     end
 
     local r1,r2,r3,r4
@@ -2300,7 +2303,7 @@ local function CanLocalPlayerShoot()
     local local_player = entity.get_local_player()
     local local_weapon = local_player:get_player_weapon()
     
-    if not ( local_weapon or local_player ) then
+    if not ( local_weapon and local_player ) then
         return false
     end
 
@@ -2429,20 +2432,27 @@ local function Aimbot(cmd)
 
     if Aimbot_AutoReload_Switch:get() and local_weapon and local_weapon:get_weapon_reload() == -1 then
         local clip = local_weapon.m_iClip1
-        local max_clip_ptr = ffi.cast("int*",GetCSWeaponData(local_weapon,false) + 0x14)
 
-        if max_clip_ptr then
-            local max_clip = max_clip_ptr[0] -- iMaxClip1
 
-            local current_clip_percentage = clip / max_clip
+        local CSWeaponData = GetCSWeaponData(local_weapon,false)
 
-            if(current_clip_percentage < ( Aimbot_AutoReload:get() / 100 ) ) then
-                cmd.buttons = bit.bor(cmd.buttons,buttons.IN_RELOAD)
-            end
+        if not CSWeaponData then goto continue end
+
+        local max_clip_ptr = ffi.cast("int*",CSWeaponData + 0x14)
+
+        if not max_clip_ptr then goto continue end
+
+        local max_clip = max_clip_ptr[0] -- iMaxClip1
+
+        local current_clip_percentage = clip / max_clip
+
+        if(current_clip_percentage < ( Aimbot_AutoReload:get() / 100 ) ) then
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_RELOAD)
         end
         
+        ::continue::
     end
-
+    
     
     local local_aimpunch = Angle:MakeNewAngleFromNLVector(local_player.m_aimPunchAngle)
     local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:float())
@@ -2453,8 +2463,13 @@ local function Aimbot(cmd)
         -- print("Has Enemy")
         TimeSinceLastSeenEnemy = 0
         BeMoreAccurate(cmd) -- When seen enemy,always try to be more accurate
-        local weapon_type_ptr = ffi.cast("int*",GetCSWeaponData(local_weapon,true) + 0xC8)
-        if Aimbot_AutoScope_Switch:get() and weapon_type_ptr and local_weapon and local_weapon.m_zoomLevel == 0 and weapon_type_ptr[0] == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+
+        local CSWeaponData = GetCSWeaponData(local_weapon,true)
+        if not CSWeaponData then goto continue end
+        local weapon_type_ptr = ffi.cast("int*",CSWeaponData + 0xC8)
+        if not weapon_type_ptr then goto continue end
+
+        if Aimbot_AutoScope_Switch:get() and local_weapon and local_weapon.m_zoomLevel == 0 and weapon_type_ptr[0] == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
         end
 
@@ -2466,6 +2481,7 @@ local function Aimbot(cmd)
                 LatestTargetAngle = AngleToTarget - local_aimpunch
             end
         end
+        ::continue::
     else
         if NodeToMoveTo and TimeSinceLastSeenEnemy > tickrate * TimeToMove:get() then
             if Vector3D:IsValid(NodeToMoveTo.area.m_center)then
@@ -2640,7 +2656,12 @@ events.createmove:set(function(cmd)
                 -- print(" ")
                 local weapon_list = player:get_player_weapon(true)
                 for _,weapon_entity in ipairs(weapon_list)do
-                    local weapon_type_ptr = ffi.cast("int*",GetCSWeaponData(weapon_entity,true) + 0xC8)
+
+                    local CSWeaponData = GetCSWeaponData(weapon_entity,true)
+
+                    if not CSWeaponData then goto continue end
+
+                    local weapon_type_ptr = ffi.cast("int*",CSWeaponData + 0xC8)
                     if not weapon_type_ptr then goto continue end
                     
                     local weapon_type = weapon_type_ptr[0]
@@ -3146,9 +3167,11 @@ end)
 events.player_spawn:set(function(event)
     
     local local_player = entity.get_local_player()
-    if local_player == nil then
-        return
+
+    if not local_player then 
+        return 
     end
+
     local player_info = local_player:get_player_info()
     local UserID = player_info.userid
     if (event.userid == UserID) then
@@ -3158,7 +3181,6 @@ events.player_spawn:set(function(event)
         if AutoBuy_Switch:get() then
             AutoBuy()
         end
-        
     end
 
 end)
