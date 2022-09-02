@@ -1,3 +1,5 @@
+_DEBUG = true
+
 local Angle = {
     x,y,z
 }

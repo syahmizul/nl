@@ -1,3 +1,5 @@
+_DEBUG = true
+
 local Vector3D = require("neverlose/vector3d_silverhawk21")
 local Angle = require("neverlose/qangle_silverhawk21")
 local Math = {

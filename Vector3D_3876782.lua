@@ -1,3 +1,5 @@
+_DEBUG = true
+
 local Vector3D = {
     x,y,z
 }
