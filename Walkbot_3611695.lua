@@ -104,11 +104,12 @@
 -- end
 -- Valve file API above^^
 
-_DEBUG = true
-
 local Vector3D = require("neverlose/vector3d_silverhawk21")
 local Angle = require("neverlose/qangle_silverhawk21")
 local Math = require("neverlose/math_silverhawk21")
+
+local HalfHumanWidth    = 16
+local HalfHumanHeight   = 35.5   
 
 local function GetVirtualFunction(address,index)
     local vtable = ffi.cast("uint32_t**",address)[0]
@@ -327,9 +328,30 @@ end
 
 local g_GlobalVars = ffi.cast("uint32_t**",utils.opcode_scan("client.dll","A1 ? ? ? ? 5E 8B 40 10",1))[0][0]
 
-local function m_bRemoteClient()
+
+local function IsRemoteClient() -- always false anyway,maybe overriden by cheat.
     return ffi.cast("bool*",g_GlobalVars + 0x32)[0]
 end 
+
+local function GetTickCount()
+    return ffi.cast("int*",g_GlobalVars + 0x1C)[0]
+end 
+
+ffi.cdef[[
+
+    typedef bool(__thiscall* HasC4_FN )(uint32_t this);
+]]
+
+local function HasC4(PlayerPointer)
+    if PlayerPointer then
+        return ffi.cast("HasC4_FN",utils.opcode_scan("client.dll","56 8B F1 85 F6 74 31"))(PlayerPointer)
+    else
+        return false
+    end
+    
+
+end
+
 local function DumpTable(o)
     if type(o) == 'table' then
         local s = '{ '
@@ -572,7 +594,7 @@ local AutoBuy_MenuGroup = ui.create("Auto Buy", "Auto Buy")
 local AutoBuy_Switch = AutoBuy_MenuGroup:switch("Enable",false)
 
 -- local AutoBuy_Print_Logs = Menu.Switch("Auto Buy","Auto Buy", "Print Logs", false,"")
-local AutoBuy_Print_Logs = AutoBuy_MenuGroup:switch("Print Logs",false)
+-- local AutoBuy_Print_Logs = AutoBuy_MenuGroup:switch("Print Logs",false)
 
 -- local AutoBuy_PrimaryWeapon = Menu.Combo("Auto Buy","Auto Buy", "Primary Weapon", {primaryWeapons[1][1], primaryWeapons[2][1], primaryWeapons[3][1], primaryWeapons[4][1], primaryWeapons[5][1], primaryWeapons[6][1],primaryWeapons[7][1],primaryWeapons[8][1],primaryWeapons[9][1],primaryWeapons[10][1],primaryWeapons[11][1],primaryWeapons[12][1],primaryWeapons[13][1],primaryWeapons[14][1],primaryWeapons[15][1],primaryWeapons[16][1],primaryWeapons[17][1]}, 0, "")
 local AutoBuy_PrimaryWeapon = AutoBuy_MenuGroup:combo("Primary Weapon",AutoBuyGenerateOptionName(primaryWeapons))
@@ -604,20 +626,34 @@ local AutoBuy_Equipment = AutoBuy_MenuGroup:selectable("Equipment",AutoBuyGenera
 -- local AutoBuy_Defuser_Switch = AutoBuy_MenuGroup:switch("Buy Defuser",false)
 
 local function AutoBuy()
+    local final_command = ""
+
     for k,v in ipairs(primaryWeapons[AutoBuy_PrimaryWeapon:get()]) do
-        utils.console_exec("buy " .. "\"" .. v .. "\";" )
-    end
-
-    for k,v in ipairs(secondaryWeapons[AutoBuy_SecondaryWeapon:get()]) do
-        utils.console_exec("buy " .. "\"" .. v .. "\";" )
-    end
-
-    for k,v in ipairs(AutoBuy_Equipment:get()) do
-        for i,j in ipairs(equipments[v])do
-            utils.console_exec("buy " .. "\"" .. j .. "\";" )
+        if v then 
+            final_command = final_command  .. "buy \"" .. v .. "\" ;"
         end
     end
 
+
+
+    local secondaryWeapon_command = "buy"
+    for k,v in ipairs(secondaryWeapons[AutoBuy_SecondaryWeapon:get()]) do
+        if v then 
+            final_command = final_command  .. "buy \"" .. v .. "\" ;"
+        end
+    end
+
+
+    local equipment_command = "buy"
+    for k,v in ipairs(AutoBuy_Equipment:get()) do
+        for i,j in ipairs(equipments[v])do
+            if j then
+                final_command = final_command  .. "buy \"" .. j .. "\" ;"
+            end
+        end
+    end
+    print(final_command)
+    utils.console_exec(final_command)
 end
 
 local buttons = {
@@ -680,17 +716,46 @@ local Hitboxes_Normal = {
 	e_hitboxes.CHEST	        ,
 	e_hitboxes.THORAX	        ,
 	e_hitboxes.BODY	            ,
-	e_hitboxes.PELVIS	        
+	e_hitboxes.PELVIS	        ,
+
+    e_hitboxes.LEFT_FOOT        ,
+    e_hitboxes.RIGHT_FOOT       ,
+    e_hitboxes.LEFT_HAND        ,
+    e_hitboxes.RIGHT_HAND       ,
+    e_hitboxes.LEFT_CALF        ,
+    e_hitboxes.RIGHT_CALF       ,
+    e_hitboxes.LEFT_FOREARM     ,
+    e_hitboxes.RIGHT_FOREARM    ,
+    e_hitboxes.LEFT_THIGH       ,
+    e_hitboxes.RIGHT_THIGH      ,
+    e_hitboxes.LEFT_UPPER_ARM   ,
+    e_hitboxes.RIGHT_UPPER_ARM  ,
+
 }
 
 local Hitboxes_BodyAim = {
 	
+    e_hitboxes.PELVIS	        ,
+    e_hitboxes.THORAX	        ,
+    e_hitboxes.BODY	            ,
+    e_hitboxes.CHEST	        ,
 	e_hitboxes.UPPER_CHEST	    ,
-	e_hitboxes.CHEST	        ,
-	e_hitboxes.THORAX	        ,
-	e_hitboxes.BODY	            ,
-	e_hitboxes.PELVIS	        ,
-	
+
+    
+	e_hitboxes.LEFT_FOOT        ,
+    e_hitboxes.RIGHT_FOOT       ,
+    e_hitboxes.LEFT_HAND        ,
+    e_hitboxes.RIGHT_HAND       ,
+    e_hitboxes.LEFT_CALF        ,
+    e_hitboxes.RIGHT_CALF       ,
+    e_hitboxes.LEFT_FOREARM     ,
+    e_hitboxes.RIGHT_FOREARM    ,
+    e_hitboxes.LEFT_THIGH       ,
+    e_hitboxes.RIGHT_THIGH      ,
+    e_hitboxes.LEFT_UPPER_ARM   ,
+    e_hitboxes.RIGHT_UPPER_ARM  ,
+
+
 	e_hitboxes.NECK	            ,
 	e_hitboxes.HEAD			    
 	
@@ -1915,8 +1980,105 @@ local NotMovingTicks = 1
 -- TODO : Use better methods of keeping track of time instead of using these modulo operations
 
 local CycleAttempt = 1 
-local CycleMethods = 8
+local CycleMethods = 5
 -- local LastLocation = nil
+
+local function BreakBreakablesAndOpenOpenable(cmd,position)
+
+    local local_player = entity.get_local_player()
+    local LocalEyePos = local_player:get_eye_position()
+    local LocalEyePosCustom = Vector3D:new()
+    LocalEyePosCustom:CopyOther(LocalEyePos)
+
+
+   
+    -- ======================For Testing======================
+    
+    -- local camera_forward = Vector3D:new()
+    -- Math:AngleVectors(render.camera_angles(),camera_forward)
+
+
+    -- camera_forward = camera_forward:MultiplySingle(8192.0)
+    -- camera_forward = camera_forward + LocalEyePosCustom
+    -- local door_min = vector( -15, -15, -15);
+    -- local door_max = vector( 15, 15, 15 );
+    -- local VectorToUseCustom = vector(camera_forward.x,camera_forward.y,camera_forward.z)
+    -- local traced_custom = utils.trace_hull(LocalEyePos, VectorToUseCustom,door_min,door_max,local_player,0x600400B)
+
+    -- if traced_custom.entity then
+    --     print("Class ID",traced_custom.entity:get_classid())
+    --     print("m_iName",traced_custom.entity.m_iName)
+    --     print("classname",traced_custom.entity:get_classname())
+
+    -- end
+
+    -- ======================For Testing======================
+
+
+    local PositionAngle = Math:CalcAngle(LocalEyePos,position)
+    local forward = Vector3D:new()
+    Math:AngleVectors(PositionAngle,forward)
+
+    forward = forward:MultiplySingle(8192.0)
+    forward = forward + LocalEyePosCustom
+
+    local mins = vector( -15, -15, -15);
+    local maxs = vector( 15, 15, 15 );
+
+    local VectorToUse = vector(forward.x,forward.y,forward.z)
+    local traced = utils.trace_hull(LocalEyePos, VectorToUse,mins,maxs,local_player,0x600400B)
+
+
+    if traced.entity and traced.entity[0] then
+        
+        if traced.entity:get_classid() == 143 then
+            local min_entity = traced.entity.m_vecMins
+            local max_entity = traced.entity.m_vecMaxs
+            local origin = traced.entity:get_origin()
+
+            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,origin)
+
+            if AngleToVectorUse == nil then return end
+        
+            AngleToVectorUse:NormalizeTo180()
+            
+            cmd.forwardmove = 0.0
+            cmd.sidemove = 0.0
+            cmd.view_angles.x = AngleToVectorUse.x
+            cmd.view_angles.y = AngleToVectorUse.y
+
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
+            goto continue
+        end
+
+        if IsBreakableEntity(ffi.cast("uint32_t",traced.entity[0])) then
+            
+            local min_entity = traced.entity.m_vecMins
+            local max_entity = traced.entity.m_vecMaxs
+            local origin = traced.entity:get_origin()
+
+            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,origin)
+
+            if AngleToVectorUse == nil then return end
+        
+            AngleToVectorUse:NormalizeTo180()
+            
+            cmd.forwardmove = 0.0
+            cmd.sidemove = 0.0
+            cmd.view_angles.x = AngleToVectorUse.x
+            cmd.view_angles.y = AngleToVectorUse.y
+        
+            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+        end
+        ::continue::
+    end
+
+
+    
+end
+
+
+
 local function ObstacleAvoid(cmd)
     local tickrate = 1.0 / globals.tickinterval
 
@@ -1962,6 +2124,9 @@ local function ObstacleAvoid(cmd)
     -- print("MovingTicks : " .. MovingTicks)
     -- print("NotMovingTicks : " .. NotMovingTicks)
     local NodeToMoveTo = Path[#Path]
+
+    BreakBreakablesAndOpenOpenable(cmd,NodeToMoveTo.area.m_center)
+
     if(NotMovingTicks > 1) then
         --TODO : make a table and just loop through them by indexing using CycleAttempt
         if( CycleAttempt == 1 )then -- Check attribute flags of areas
@@ -1979,65 +2144,7 @@ local function ObstacleAvoid(cmd)
             Bhop(cmd)
         elseif ( CycleAttempt == 4 ) then -- Just crouch
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK)
-        elseif ( CycleAttempt == 5 ) then -- IN_USE what's in front of us
-            local LocalEyePos = local_player:get_eye_position()
-            local LocalEyePosCustom = Vector3D:new()
-            LocalEyePosCustom:CopyOther(LocalEyePos)
-
-            -- local VectorToUseCustom = NodeToMoveTo.area.m_center
-            -- local VectorToUse = Vector.new(VectorToUseCustom.x,VectorToUseCustom.y,VectorToUseCustom.z)
-
-            -- local traced = EngineTrace.TraceRay(LocalEyePos, VectorToUse, local_player, 0x46004003)
-
-            -- local TracedEndPosCustom = Vector3D:new(traced.endpos.x,traced.endpos.y,traced.endpos.z)
-            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,NodeToMoveTo.area.m_center)
-
-            if AngleToVectorUse == nil then return end
-            
-            AngleToVectorUse:NormalizeTo180()
-
-            cmd.forwardmove = 0.0
-            cmd.sidemove = 0.0
-            cmd.view_angles.x = AngleToVectorUse.x
-            cmd.view_angles.y = AngleToVectorUse.y
-
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
-
-            
-            
-        elseif ( CycleAttempt == 6) then -- Shoot what's in front of us    
-            local LocalEyePos = local_player:get_eye_position()
-            local LocalEyePosCustom = Vector3D:new()
-            LocalEyePosCustom:CopyOther(LocalEyePos)
-
-            local VectorToUseCustom = NodeToMoveTo.area.m_center
-            local VectorToUse = vector(VectorToUseCustom.x,VectorToUseCustom.y,VectorToUseCustom.z)
-
-            local traced = utils.trace_line(LocalEyePos, VectorToUse, local_player, 0x46004003)
-
-            if(traced.entity and traced.entity:get_classid() == 40) then
-                if(not traced.entity:is_enemy()) then
-                    return
-                end
-            end
-
-            local TracedEndPosCustom = Vector3D:new(traced.end_pos.x,traced.end_pos.y,traced.end_pos.z)
-            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,NodeToMoveTo.area.m_center)
-
-            if AngleToVectorUse == nil then return end
-
-            AngleToVectorUse:NormalizeTo180()
-            
-            cmd.forwardmove = 0.0
-            cmd.sidemove = 0.0
-            cmd.view_angles.x = AngleToVectorUse.x
-            cmd.view_angles.y = AngleToVectorUse.y
-
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
-
-        elseif ( CycleAttempt == 7) then
-            -- do nothing
-        elseif ( CycleAttempt == 8) then -- Find another end area and new starting node
+        elseif ( CycleAttempt == 5) then -- Find another end area and new starting node
             local PathReference = Path -- save old path before clearing
             TriggerPrepareToFindAnotherNode()
             ClosedList = PathReference -- prevent from using old path
@@ -2048,10 +2155,11 @@ local function ObstacleAvoid(cmd)
         if( bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then
             Bhop(cmd) -- Jump
         end
-
+    
         if( bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_CROUCH) ~= 0) then
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_DUCK) -- Crouch
         end
+    
     end
 end
 
@@ -2637,14 +2745,14 @@ events.createmove:set(function(cmd)
     local player_resource = player:get_resource()
     local m_iPlayerC4 = player_resource.m_iPlayerC4
 
-    if not(player or player:is_alive())then
+    if not(player and player:is_alive())then
         return
     end
 
     local slot_string = nil
     local weapon_level = 0
     if globals.tickcount % tickrate == 0 then 
-        if (m_iPlayerC4 == player:get_index()) then
+        if (HasC4(ffi.cast("uint32_t",player[0]))) then
             if(active_weapon:get_classid() == 34)then
                 utils.console_exec("drop;")
             else
@@ -2652,10 +2760,9 @@ events.createmove:set(function(cmd)
             end
         else
             if AutoWeaponSwitch_Switch:get() then 
-                -- print("Auto Weapon Switch Start")
-                -- print(" ")
+
                 local weapon_list = player:get_player_weapon(true)
-                for _,weapon_entity in ipairs(weapon_list)do
+                for _,weapon_entity in pairs(weapon_list)do
 
                     local CSWeaponData = GetCSWeaponData(weapon_entity,true)
 
@@ -2666,7 +2773,9 @@ events.createmove:set(function(cmd)
                     
                     local weapon_type = weapon_type_ptr[0]
                     if not weapon_type then goto continue end
-                    if (weapon_type == CSWeaponType.WEAPONTYPE_RIFLE or weapon_type == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE) and ( weapon_level < 3 ) then
+                    -- print("weapon_type",weapon_type)
+                    -- print("weapon_level",weapon_level)
+                    if (weapon_type == CSWeaponType.WEAPONTYPE_RIFLE or weapon_type == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE or weapon_type == CSWeaponType.WEAPONTYPE_SUBMACHINEGUN or weapon_type == CSWeaponType.WEAPONTYPE_MACHINEGUN or weapon_type == CSWeaponType.WEAPONTYPE_SHOTGUN) and ( weapon_level < 3 ) then
                         slot_string = "slot1"
                         weapon_level = 3
                         -- print("Changing to rifle/sniper")
@@ -2679,7 +2788,6 @@ events.createmove:set(function(cmd)
                         weapon_level = 1
                         -- print("Changing to knife")
                     end
-                    
                     ::continue::
                 end
                 if slot_string ~= nil then
@@ -2707,8 +2815,8 @@ events.createmove:set(function(cmd)
         LastMapName = common.get_map_data().shortname
         return
     end
-
-    if globals.tickcount % 1 == 0 and INavFile.m_isLoaded and not( m_bRemoteClient() and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
+    
+    if globals.tickcount % 1 == 0 and INavFile.m_isLoaded and not( not utils.net_channel().is_loopback and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
         --print("Iteration : ",iteration)
         if not m_bFreezePeriod  then 
             if(#Path == 0) then
@@ -2729,9 +2837,10 @@ events.createmove:set(function(cmd)
                 end
                 CheckIfArrivedAtNode(cmd)
             end
-            if (bit.band(cmd.buttons,buttons.IN_ATTACK) == 0)then 
-                Aimbot(cmd)
-            end
+            
+        end
+        if (bit.band(cmd.buttons,buttons.IN_ATTACK) == 0)then 
+            Aimbot(cmd)
         end
         -- print("TimeSinceLastSeenEnemy : ",TimeSinceLastSeenEnemy)
     end
@@ -2910,13 +3019,12 @@ local AutoQueuePanorama = panorama.loadstring([[
             {
                 LobbyAPI.CreateSession();
             }
-            
             if 
             (
                 !( 
                     GameStateAPI.IsConnectedOrConnectingToServer() || 
                     LobbyAPI.GetMatchmakingStatusString() || 
-                    CompetitiveMatchAPI.GetCooldownSecondsRemaining() > 0 || 
+                    ( CompetitiveMatchAPI.GetCooldownSecondsRemaining() > 0 && LobbyAPI.GetSessionSettings().game.type == "classic" && LobbyAPI.GetSessionSettings().game.mode == "competitive" && LobbyAPI.GetSessionSettings().options.server == "official") ||
                     CompetitiveMatchAPI.HasOngoingMatch()  ||
                     GameStateAPI.IsLocalPlayerPlayingMatch() || 
                     GameStateAPI.IsLocalPlayerWatchingOwnDemo()
