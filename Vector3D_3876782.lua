@@ -14,6 +14,15 @@ function Vector3D:new(x,y,z)
     return Object
 end
 
+function Vector3D:NewCustom(CustomVector)
+    local Object = {}
+    setmetatable(Object,self)
+    Object.x = CustomVector.x or 0.00
+    Object.y = CustomVector.y or 0.00
+    Object.z = CustomVector.z or 0.00
+    return Object
+end
+
 --- Makes a copy of itself
 function Vector3D:Copy()
     local CopyVector = Vector3D:new()
@@ -303,4 +312,5 @@ function Vector3D:IsValid(vector)
 
     return true
 end
+
 return Vector3D

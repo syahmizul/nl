@@ -14,6 +14,15 @@ function Angle:new(x,y,z)
     return Object
 end
 
+function Angle:NewCustom(CustomAngle)
+    local Object = {}
+    setmetatable(Object,self)
+    Object.x = CustomAngle.pitch or CustomAngle.x or 0.00
+    Object.y = CustomAngle.yaw or CustomAngle.y or 0.00
+    Object.z = CustomAngle.roll or CustomAngle.z or 0.00
+    return Object
+end
+
 --- Makes a copy of itself
 function Angle:Copy()
     local CopyVector = Angle:new()
@@ -21,22 +30,6 @@ function Angle:Copy()
     CopyVector.y = self.y
     CopyVector.z = self.z
     return CopyVector
-end
-
-function Angle:MakeNewAngleFromNLAngle(NeverLoseAngle)
-    local NewAngle = Angle:new()
-    NewAngle.x = NeverLoseAngle.pitch or 0.00
-    NewAngle.y = NeverLoseAngle.yaw or 0.00
-    NewAngle.z = NeverLoseAngle.roll or 0.00
-    return NewAngle
-end
-
-function Angle:MakeNewAngleFromNLVector(NeverLoseVector)
-    local NewAngle = Angle:new()
-    NewAngle.x = NeverLoseVector.x or 0.00
-    NewAngle.y = NeverLoseVector.y or 0.00
-    NewAngle.z = NeverLoseVector.z or 0.00
-    return NewAngle
 end
 
 --- Copies another Vector's members
@@ -283,30 +276,5 @@ function Angle:IsValid(angle)
     return true
 end
 
---function Angle:DistTo(vOther)
---
---    local delta = Angle:new()
---
---    delta.x = self.x - vOther.x
---    delta.y = self.y - vOther.y
---    delta.z = self.z - vOther.z
---
---    return delta:Length()
---end
---
---function Angle:DistToSqr(vOther)
---
---    local delta = Angle:new()
---
---    delta.x = self.x - vOther.x
---    delta.y = self.y - vOther.y
---    delta.z = self.z - vOther.z
---
---    return delta:LengthSqr()
---end
-
 return Angle
 
---[[Example]]
---local NewVector = Vector:new()
---NewVector:SetMembers(12,32,132)

@@ -1,7 +1,7 @@
 _DEBUG = true
 
-local Vector3D = require("neverlose/vector3d_silverhawk21")
-local Angle = require("neverlose/qangle_silverhawk21")
+local Vector3D = require("Vector3D_3876782")
+local Angle = require("QAngle_3876787")
 local Math = {
     PI = 3.14159265358979323846,
     PI_2 = 3.14159265358979323846 * 2.0,
@@ -17,6 +17,7 @@ function Math:VectorDistance(v1,v2)
 end
 
 function Math:CalcAngle(src,dst)
+
     local vAngle = Angle:new()
     local delta = Vector3D:new()
     delta:SetMembers(src.x - dst.x ,src.y - dst.y,src.z - dst.z)
