@@ -1,10 +1,13 @@
-_DEBUG = true
-
 local Vector3D = {
     x,y,z
 }
 Vector3D.__index = Vector3D
 
+---Makes a new Vector3D with the arguments as the components,or zero-ed if not provided.
+---@param x float
+---@param y float
+---@param z float
+---@return Vector3D
 function Vector3D:new(x,y,z)
     local Object = {}
     setmetatable(Object,self)
@@ -14,6 +17,9 @@ function Vector3D:new(x,y,z)
     return Object
 end
 
+---Makes a new Vector3D from another type
+---@param CustomVector Vector3D
+---@return table
 function Vector3D:NewCustom(CustomVector)
     local Object = {}
     setmetatable(Object,self)
@@ -23,7 +29,7 @@ function Vector3D:NewCustom(CustomVector)
     return Object
 end
 
---- Makes a copy of itself
+-- Makes a copy of itself and returns it
 function Vector3D:Copy()
     local CopyVector = Vector3D:new()
     CopyVector.x = self.x
@@ -32,19 +38,21 @@ function Vector3D:Copy()
     return CopyVector
 end
 
---- Copies another Vector3D's members
+-- Copies another Vector3D's/any Vector type with the same component name members.
 function Vector3D:CopyOther(v)
     self.x = v.x
     self.y = v.y
     self.z = v.z
 end
 
+-- Sets the vector's components from the arguments.
 function Vector3D:SetMembers(x,y,z)
   self.x = x
   self.y = y
   self.z = z
 end
 
+-- Sets the x component of the vector
 function Vector3D:SetX(x)
   self.x = x
 end
@@ -75,31 +83,21 @@ function Vector3D:Zero()
     self.z = 0
 end
 
---if the difference is higher than tolerance,THEN theres a difference
--- limit is like a radius
 function Vector3D:IsDifference2D(v,limit)
     
     if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) then
-        -- print("IsDifference true")
         return true
     end
-    -- print(math.abs(self.x - v.x))
-    -- print(math.abs(self.y - v.y))
-    -- print("IsDifference false")
+
     return false
 end
 
--- z limit should be more loose since we have less control over the z position
+
 function Vector3D:IsDifference3D(v,limit,z_limit)
     
     if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) or (math.abs(self.z - v.z) >= (z_limit or limit)) then
-        -- print("IsDifference true")
         return true
     end
-    -- print(math.abs(self.x - v.x))
-    -- print(math.abs(self.y - v.y))
-    -- print(math.abs(self.z - v.z))
-    -- print("IsDifference false")
     return false
 end
 
@@ -113,7 +111,6 @@ function Vector3D:PrintValue()
     print("x : " .. self.x .. " y : " .. self.y .. " z : " .. self.z)
 end
 
--- For copy pasting into setpos command
 function Vector3D:PrintValueClean()
     print(self.x .. " " .. self.y .. " " .. self.z)
 end

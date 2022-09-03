@@ -1,7 +1,6 @@
-_DEBUG = true
+local Vector3D = require("neverlose/vector3d_silverhawk21")
+local Angle = require("neverlose/qangle_silverhawk21")
 
-local Vector3D = require("Vector3D_3876782")
-local Angle = require("QAngle_3876787")
 local Math = {
     PI = 3.14159265358979323846,
     PI_2 = 3.14159265358979323846 * 2.0,

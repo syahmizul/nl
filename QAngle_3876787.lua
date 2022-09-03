@@ -1,5 +1,3 @@
-_DEBUG = true
-
 local Angle = {
     x,y,z
 }
@@ -160,14 +158,6 @@ end
 function Angle:LengthSqr()
     return ( self.x*self.x + self.y*self.y + self.z*self.z )
 end
-
---function Angle:Length2D()
---    return math.sqrt(self.x*self.x + self.y*self.y)
---end
-
---function Angle:Dot(v)
---    return ( self.x * v.x + self.y * v.y + self.z * v.z )
---end
 
 --- Adds with a single float number instead of another Vector
 --- @param fl number

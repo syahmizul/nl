@@ -1,6 +1,6 @@
-local Vector3D = require("Vector3D_3876782")
-local Angle = require("QAngle_3876787")
-local Math = require("Math_3876789")
+local Vector3D = require("neverlose/vector3d_silverhawk21")
+local Angle = require("neverlose/qangle_silverhawk21")
+local Math = require("neverlose/math_silverhawk21")
 
 local function GetVirtualFunction(address,index)
     local vtable = ffi.cast("uint32_t**",address)[0]
@@ -79,7 +79,6 @@ local function DumpTable(o)
         return tostring(o)
     end
 end
-
 
 local FileBuffer = {
     Position = 0,
@@ -1114,8 +1113,7 @@ end
 
 local function FindNearestAreaToPlayer(AreaList,player)
 
-    local player_position = Vector3D:new()
-    player_position:CopyOther(player:get_origin())
+    local player_position = Vector3D:NewCustom(player:get_origin())
 
     local Latest_Distance = math.huge
     local Nearest_Area = nil
@@ -1458,8 +1456,7 @@ local function BreakBreakablesAndOpenOpenable(cmd,position)
 
     local local_player = entity.get_local_player()
     local LocalEyePos = local_player:get_eye_position()
-    local LocalEyePosCustom = Vector3D:new()
-    LocalEyePosCustom:CopyOther(LocalEyePos)
+    local LocalEyePosCustom = Vector3D:NewCustom(LocalEyePos)
 
 
    
@@ -1557,9 +1554,8 @@ local function ObstacleAvoid(cmd)
     local tickrate = 1.0 / globals.tickinterval
 
     local local_player = entity.get_local_player()
-    local local_player_pos = Vector3D:new()
+    local local_player_pos = Vector3D:NewCustom(local_player:get_origin())
     local local_player_weapon = local_player:get_player_weapon()
-    local_player_pos:CopyOther(local_player:get_origin())
     
     local max_speed = 230.0
     if local_player_weapon then
@@ -1634,9 +1630,6 @@ local function MoveToTarget(cmd)
     local local_player = entity.get_local_player()
     local local_player_pos = local_player:get_origin()
     local local_weapon = local_player:get_player_weapon()
-    
-
-    
     local view_angles = Angle:NewCustom(render.camera_angles())
 
     local NodeToMoveTo = Path[#Path]
@@ -1649,7 +1642,7 @@ local function MoveToTarget(cmd)
     AngleToNode.x = 0.0
     view_angles.z = 0.0
     AngleToNode.z = 0.0
-    AngleToNode = (view_angles - AngleToNode) -- AngleToNode - view_angles if the game's angles is clock wise
+    AngleToNode = (view_angles - AngleToNode)
 
 
 
@@ -1657,8 +1650,7 @@ local function MoveToTarget(cmd)
 
 
     Math:AngleVectors(AngleToNode,forward)
-    -- print(TimeSinceLastSeenEnemy)
-    
+
     forward = forward:MultiplySingle(450)
 
 
@@ -1824,8 +1816,7 @@ local function CheckHitchanceUniform (angle,TargetEntity)
     local local_player  = entity.get_local_player()
     local weapon        = local_player:get_player_weapon()
 
-    local start         = Vector3D:new()
-    start:CopyOther(local_player:get_eye_position())
+    local start         = Vector3D:NewCustom(local_player:get_eye_position())
 
     local spread            =   weapon:get_spread()
     local inaccuracy        =   weapon:get_inaccuracy()
