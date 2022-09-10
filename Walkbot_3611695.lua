@@ -1,11 +1,889 @@
-local Vector3D = require("neverlose/vector3d_silverhawk21")
-local Angle = require("neverlose/qangle_silverhawk21")
-local Math = require("neverlose/math_silverhawk21")
+local Vector3D = {
+    x,y,z
+}
+Vector3D.__index = Vector3D
+
+---Makes a new Vector3D with the arguments as the components,or zero-ed if not provided.
+---@param x float
+---@param y float
+---@param z float
+---@return Vector3D
+function Vector3D:new(x,y,z)
+    local Object = {}
+    setmetatable(Object,self)
+    Object.x = x or 0.00
+    Object.y = y or 0.00
+    Object.z = z or 0.00
+    return Object
+end
+
+---Makes a new Vector3D from another type
+---@param CustomVector Vector3D
+---@return table
+function Vector3D:NewCustom(CustomVector)
+    local Object = {}
+    setmetatable(Object,self)
+    Object.x = CustomVector.x or 0.00
+    Object.y = CustomVector.y or 0.00
+    Object.z = CustomVector.z or 0.00
+    return Object
+end
+
+-- Makes a copy of itself and returns it
+function Vector3D:Copy()
+    local CopyVector = Vector3D:new()
+    CopyVector.x = self.x
+    CopyVector.y = self.y
+    CopyVector.z = self.z
+    return CopyVector
+end
+
+-- Copies another Vector3D's/any Vector type with the same component name members.
+function Vector3D:CopyOther(v)
+    self.x = v.x
+    self.y = v.y
+    self.z = v.z
+end
+
+-- Sets the vector's components from the arguments.
+function Vector3D:SetMembers(x,y,z)
+  self.x = x
+  self.y = y
+  self.z = z
+end
+
+-- Sets the x component of the vector
+function Vector3D:SetX(x)
+  self.x = x
+end
+
+function Vector3D:SetY(y)
+    self.y = y
+end
+
+function Vector3D:SetZ(z)
+    self.z = z
+end
+
+function Vector3D:GetX()
+    return self.x
+end
+
+function Vector3D:GetY()
+    return self.y
+end
+
+function Vector3D:GetZ()
+    return self.z
+end
+
+function Vector3D:Zero()
+    self.x = 0
+    self.y = 0
+    self.z = 0
+end
+
+function Vector3D:IsDifference2D(v,limit)
+    
+    if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) then
+        return true
+    end
+
+    return false
+end
+
+
+function Vector3D:IsDifference3D(v,limit,z_limit)
+    
+    if(math.abs(self.x - v.x) >= limit) or (math.abs(self.y - v.y) >= limit) or (math.abs(self.z - v.z) >= (z_limit or limit)) then
+        return true
+    end
+    return false
+end
+
+function Vector3D:SetMemberFromFloatType(FloatVariable)
+	self.x = FloatVariable[0]
+	self.y = FloatVariable[1]
+	self.z = FloatVariable[2]
+end
+
+function Vector3D:PrintValue()
+    print("x : " .. self.x .. " y : " .. self.y .. " z : " .. self.z)
+end
+
+function Vector3D:PrintValueClean()
+    print(self.x .. " " .. self.y .. " " .. self.z)
+end
+
+function Vector3D:__add(v)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x + v.x
+    SolvedVector.y = self.y + v.y
+    SolvedVector.z = self.z + v.z
+    return SolvedVector
+end
+
+function Vector3D:__sub(v)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x - v.x
+    SolvedVector.y = self.y - v.y
+    SolvedVector.z = self.z - v.z
+    return SolvedVector
+end
+
+function Vector3D:__mul(v)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x * v.x
+    SolvedVector.y = self.y * v.y
+    SolvedVector.z = self.z * v.z
+    return SolvedVector
+end
+
+function Vector3D:__div(v)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x / v.x
+    SolvedVector.y = self.y / v.y
+    SolvedVector.z = self.z / v.z
+    return SolvedVector
+end
+
+function Vector3D:__mod(v)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x % v.x
+    SolvedVector.y = self.y % v.y
+    SolvedVector.z = self.z % v.z
+    return SolvedVector
+end
+
+function Vector3D:__pow(v)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x ^ v.x
+    SolvedVector.y = self.y ^ v.y
+    SolvedVector.z = self.z ^ v.z
+    return SolvedVector
+end
+
+function Vector3D:__eq(v)
+    if self.x ~= v.x then return false end
+    if self.y ~= v.y then return false end
+    if self.z ~= v.z then return false end
+    return true
+end
+
+function Vector3D:__lt(v) -- <
+    if self.x >= v.x then return false end
+    if self.y >= v.y then return false end
+    if self.z >= v.z then return false end
+    return true
+end
+
+function Vector3D:__le(v)  -- <=
+    if self.x > v.x then return false end
+    if self.y > v.y then return false end
+    if self.z > v.z then return false end
+    return true
+end
+
+function Vector3D:Length()
+    return math.sqrt( self.x*self.x + self.y*self.y + self.z*self.z )
+end
+
+function Vector3D:LengthSqr()
+    return ( self.x*self.x + self.y*self.y + self.z*self.z )
+end
+
+function Vector3D:Length2D()
+    return math.sqrt(self.x*self.x + self.y*self.y)
+end
+
+function Vector3D:Dot(v)
+    return ( self.x * v.x + self.y * v.y + self.z * v.z )
+end
+
+--- Adds with a single float number instead of another Vector3D
+--- @param fl number
+--- @return userdata
+function Vector3D:AddSingle(fl)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x + fl
+    SolvedVector.y = self.y + fl
+    SolvedVector.z = self.z + fl
+    return self
+end
+
+--- Subtracts with a single float number instead of another Vector3D
+--- @param fl number
+--- @return userdata
+function Vector3D:SubtractSingle(fl)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x - fl
+    SolvedVector.y = self.y - fl
+    SolvedVector.z = self.z - fl
+    return SolvedVector
+end
+
+--- Multiplies with a single float number instead of another Vector3D
+--- @param fl number
+--- @return userdata
+function Vector3D:MultiplySingle(fl)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x * fl
+    SolvedVector.y = self.y * fl
+    SolvedVector.z = self.z * fl
+    return SolvedVector
+end
+
+--- Divides with a single float number instead of another Vector3D
+--- @param fl number
+--- @return userdata
+function Vector3D:DivideSingle(fl)
+    local SolvedVector = Vector3D:new()
+    SolvedVector.x = self.x / fl
+    SolvedVector.y = self.y / fl
+    SolvedVector.z = self.z / fl
+    return SolvedVector
+end
+
+function Vector3D:Normalized()
+
+    local res = self:Copy()
+    local l = res:Length()
+    if ( l ~= 0.0 ) then
+        res = res:DivideSingle(l)
+    else
+        res.x = 0
+        res.y = 0
+        res.z = 0
+    end
+    return res
+end
+
+function Vector3D:DistTo(vOther)
+
+    local delta = Vector3D:new()
+
+    delta.x = self.x - vOther.x
+    delta.y = self.y - vOther.y
+    delta.z = self.z - vOther.z
+
+    return delta:Length()
+end
+
+function Vector3D:DistTo2D(vOther)
+
+    local delta = Vector3D:new()
+
+    delta.x = self.x - vOther.x
+    delta.y = self.y - vOther.y
+
+    return delta:Length2D()
+end
+
+function Vector3D:DistToManhattanVer(vOther)
+
+    local delta = Vector3D:new()
+
+    delta.x = math.abs(self.x - vOther.x)
+    delta.y = math.abs(self.y - vOther.y)
+    delta.z = math.abs(self.z - vOther.z)
+
+    return delta.x + delta.y + delta.z
+end
+
+function Vector3D:DistToSqr(vOther)
+
+    local delta = Vector3D:new()
+
+    delta.x = self.x - vOther.x
+    delta.y = self.y - vOther.y
+    delta.z = self.z - vOther.z
+
+    return delta:LengthSqr()
+end
+
+-- Global/Static/Helper functions
+function Vector3D:IsValid(vector)
+    if vector.x ~= vector.x or vector.y ~= vector.y or vector.z ~= vector.z then
+        return false
+    end
+
+    return true
+end
+
+local Angle = {
+    x,y,z
+}
+Angle.__index = Angle
+
+function Angle:new(x,y,z)
+    local Object = {}
+    setmetatable(Object,self)
+    Object.x = x or 0.00
+    Object.y = y or 0.00 
+    Object.z = z or 0.00
+    return Object
+end
+
+function Angle:NewCustom(CustomAngle)
+    local Object = {}
+    setmetatable(Object,self)
+    Object.x = CustomAngle.pitch or CustomAngle.x or 0.00
+    Object.y = CustomAngle.yaw or CustomAngle.y or 0.00
+    Object.z = CustomAngle.roll or CustomAngle.z or 0.00
+    return Object
+end
+
+--- Makes a copy of itself
+function Angle:Copy()
+    local CopyVector = Angle:new()
+    CopyVector.x = self.x
+    CopyVector.y = self.y
+    CopyVector.z = self.z
+    return CopyVector
+end
+
+--- Copies another Vector's members
+function Angle:CopyOther(v)
+    self.x = v.x
+    self.y = v.y
+    self.z = v.z
+end
+
+function Angle:SetMembers(x, y, z)
+    self.x = x
+    self.y = y
+    self.z = z
+end
+
+function Angle:SetX(x)
+    self.x = x
+end
+
+function Angle:SetY(y)
+    self.y = y
+end
+
+function Angle:SetZ(z)
+    self.z = z
+end
+
+function Angle:GetX(x)
+    return self.x
+end
+
+function Angle:GetY(y)
+    return self.y
+end
+
+function Angle:GetZ(z)
+    return self.z
+end
+
+function Angle:Zero()
+    self.x = 0.00
+    self.y = 0.00
+    self.z = 0.00
+end
+
+function Angle:PrintValue()
+    print("x : " .. self.x .. " y : " .. self.y .. " z : " .. self.z)
+end
+
+-- For copy pasting into setpos command
+function Angle:PrintValueClean()
+    print(self.x .. " " .. self.y .. " " .. self.z)
+end
+
+function Angle:__add(v)
+    local SolvedVector = Angle:new()
+    SolvedVector.x = self.x + v.x
+    SolvedVector.y = self.y + v.y
+    SolvedVector.z = self.z + v.z
+    return SolvedVector
+end
+
+function Angle:__sub(v)
+    local SolvedVector = Angle:new()
+    SolvedVector.x = self.x - v.x
+    SolvedVector.y = self.y - v.y
+    SolvedVector.z = self.z - v.z
+    return SolvedVector
+end
+
+function Angle:__mul(v)
+    local SolvedVector = Angle:new()
+    SolvedVector.x = self.x * v.x
+    SolvedVector.y = self.y * v.y
+    SolvedVector.z = self.z * v.z
+    return SolvedVector
+end
+
+function Angle:__div(v)
+    local SolvedVector = Angle:new()
+    SolvedVector.x = self.x / v.x
+    SolvedVector.y = self.y / v.y
+    SolvedVector.z = self.z / v.z
+    return SolvedVector
+end
+
+function Angle:__mod(v)
+    local SolvedVector = Angle:new()
+    SolvedVector.x = self.x % v.x
+    SolvedVector.y = self.y % v.y
+    SolvedVector.z = self.z % v.z
+    return SolvedVector
+end
+
+function Angle:__pow(v)
+    local SolvedVector = Angle:new()
+    SolvedVector.x = self.x ^ v.x
+    SolvedVector.y = self.y ^ v.y
+    SolvedVector.z = self.z ^ v.z
+    return SolvedVector
+end
+
+function Angle:__eq(v)
+    if self.x ~= v.x then return false end
+    if self.y ~= v.y then return false end
+    if self.z ~= v.z then return false end
+    return true
+end
+
+function Angle:__lt(v) -- <
+    if self.x >= v.x then return false end
+    if self.y >= v.y then return false end
+    if self.z >= v.z then return false end
+    return true
+end
+
+function Angle:__le(v)  -- <=
+    if self.x > v.x then return false end
+    if self.y > v.y then return false end
+    if self.z > v.z then return false end
+    return true
+end
+
+function Angle:Length()
+    return math.sqrt( self.x*self.x + self.y*self.y + self.z*self.z )
+end
+
+function Angle:LengthSqr()
+    return ( self.x*self.x + self.y*self.y + self.z*self.z )
+end
+
+--- Adds with a single float number instead of another Vector
+--- @param fl number
+--- @return userdata
+function Angle:AddSingle(fl)
+    self.x = self.x + fl
+    self.y = self.y + fl
+    self.z = self.z + fl
+    return self
+end
+
+--- Subtracts with a single float number instead of another Vector
+--- @param fl number
+--- @return userdata
+function Angle:SubtractSingle(fl)
+    self.x = self.x - fl
+    self.y = self.y - fl
+    self.z = self.z - fl
+    return self
+end
+
+--- Multiplies with a single float number instead of another Vector
+--- @param fl number
+--- @return userdata
+function Angle:MultiplySingle(fl)
+    self.x = self.x * fl
+    self.y = self.y * fl
+    self.z = self.z * fl
+    return self
+end
+
+--- Divides with a single float number instead of another Vector
+--- @param fl number
+--- @return userdata
+function Angle:DivideSingle(fl)
+    self.x = self.x / fl
+    self.y = self.y / fl
+    self.z = self.z / fl
+    return self
+end
+
+
+function Angle:NormalizeTo180()
+
+
+    self.x = math.fmod(self.x,178)
+
+    if (self.x > 89) then
+		self.x = 89
+    elseif (self.x < -89) then
+		self.x = -89
+    end
+
+    self.y = math.fmod(self.y,360)
+    if (self.y > 180) then
+		self.y = self.y - 360
+    elseif (self.y < -180) then
+		self.y = self.y + 360
+    end
+
+    self.z = 0.0
+
+end
+
+function Angle:NormalizeTo360()
+    self.x = math.fmod(self.x,178)
+
+    if (self.x > 89) then
+		self.x = 89
+    elseif (self.x < -89) then
+		self.x = -89
+    end
+
+    self.y = math.fmod(self.y,360)
+    
+    if (self.y < 0) then
+		self.y = self.y + 360
+    end
+
+    self.z = 0.0
+
+
+end
+
+
+function Angle:Normalized()
+
+    local res = self:Copy()
+    local fl = res:Length()
+    if ( fl ~= 0.0 ) then
+        res = res:DivideSingle(fl)
+    else
+        res.x = 0.00
+        res.y = 0.00
+        res.z = 0.00
+    end
+    return res
+end
+
+-- Global/Static/Helper functions
+function Angle:IsValid(angle)
+    if angle.x ~= angle.x or angle.y ~= angle.y or angle.z ~= angle.z then
+        return false
+    end
+
+    return true
+end
+
+local Math = {
+    PI = 3.14159265358979323846,
+    PI_2 = 3.14159265358979323846 * 2.0,
+    SMALL_NUM = -2147483648
+ }
+Math.__index = Math
+
+function Math:VectorDistance(v1,v2)
+    local x = v1.x - v2.x
+    local y = v1.y - v2.y
+    local z = v1.z - v2.z
+    return math.sqrt(x*x + y*y + z*z)
+end
+
+function Math:CalcAngle(src,dst)
+
+    local vAngle = Angle:new()
+    local delta = Vector3D:new()
+    delta:SetMembers(src.x - dst.x ,src.y - dst.y,src.z - dst.z)
+
+    if not Vector3D:IsValid(delta) then return nil end
+
+    local hyp = math.sqrt(delta.x * delta.x + delta.y * delta.y)
+
+    if hyp ~= hyp then return nil end
+
+    vAngle.x = math.atan(delta.z/hyp) * 57.295779513082
+    vAngle.y = math.atan(delta.y/delta.x) * 57.295779513082
+    vAngle.z = 0.0
+
+    if not Angle:IsValid(vAngle) then return nil end
+
+    if (delta.x >= 0.0) then
+        vAngle.y = vAngle.y + 180.0
+    end
+
+    return vAngle
+end
+
+function Math:GetFOV(viewAngle,aimAngle)
+    local ang = Vector3D:new()
+    local aim = Vector3D:new()
+
+    self:AngleVectors(viewAngle,aim)
+    self:AngleVectors(aimAngle,ang)
+
+    local res = math.deg(math.acos(aim:Dot(ang) / aim:LengthSqr()))
+    if res ~= res then
+        res = 0.0
+    end
+    return res
+end
+
+function Math:ClampAngles(angles)
+    if (angles.x > 89.0) then
+        angles.x = 89.0
+    elseif (angles.x < -89.0) then
+        angles.x = -89.0
+    end
+    
+
+    if (angles.y > 180.0) then
+        angles.y = 180.0
+    elseif (angles.y < -180.0) then
+        angles.y = -180.0
+    end
+
+    angles.z = 0
+end
+
+function Math:NormalizeAngles(angles)
+    if (angles.x > 89.0) then
+        angles.x = 89.0
+    elseif (angles.x < -89.0) then
+        angles.x = -89.0
+    end
+
+    if (angles.y > 180.0) then
+        angles.y = 180.0
+    elseif (angles.y < -180.0) then
+        angles.y = -180.0
+    end
+
+    angles.z = 0
+end
+
+--- Returns Sine and Cosine of Value.
+--- Sine and Cosine needs to be passed as reference / table.
+function Math:XMScalarSinCos(pSin,pCos,Value)
+    pSin[1] = math.sin(Value)
+    pCos[1] = math.cos(Value)
+end
+
+function Math:AngleVectors(angles,forward)
+
+    local sp = {}
+    local sy = {}
+    local cp = {}
+    local cy = {}
+
+    self:XMScalarSinCos(sp,cp,math.rad(angles.x))
+    self:XMScalarSinCos(sy,cy,math.rad(angles.y))
+
+    forward.x = cp[1] * cy[1]
+    forward.y = cp[1] * sy[1]
+    forward.z = -(sp[1])
+end
+
+function Math:AngleVectorsExtra(angles,forward,right,up)
+
+    local sr = {}
+    local sp = {}
+    local sy = {}
+
+    local cr = {}
+    local cp = {}
+    local cy = {}
+
+    self:XMScalarSinCos(sp,cp,math.rad(angles.x))
+    self:XMScalarSinCos(sy,cy,math.rad(angles.y))
+    self:XMScalarSinCos(sr,cr,math.rad(angles.z))
+
+
+    forward.x = cp[1] * cy[1]
+    forward.y = cp[1] * sy[1]
+    forward.z = -(sp[1])
+
+    right.x = (-1 * sr[1] * sp[1] * cy[1] + -1 * cr[1] * -(sy[1]))
+    right.y = (-1 * sr[1] * sp[1] * sy[1] + -1 * cr[1] *  cy[1])
+    right.z = (-1 * sr[1] * cp[1])
+
+    up.x = (cr[1] * sp[1] * cy[1] + -(sr[1]) * -sy[1])
+    up.y = (cr[1] * sp[1] * sy[1] + -(sr[1]) * cy[1])
+    up.z = (cr[1] * cp[1])
+end
+
+function Math:VectorAngles(forward,angles)
+    local tmp,yaw,pitch
+
+    if(forward.y == 0.0 and forward.x == 0.0) then
+        yaw = 0.0
+        if(forward.z > 0.0) then
+            pitch = 270.0
+        else
+            pitch = 90.0
+        end
+    else
+        yaw = math.atan(forward.y,forward.x) * 180.0 / 3.141592654
+        if(yaw < 0.0) then
+            yaw = yaw + 360.0
+        end
+
+        tmp = math.sqrt(forward.x * forward.x + forward.y * forward.y)
+        pitch = math.atan(-forward.z,tmp) * 180.0 / 3.141592654
+        if(pitch < 0.0)then
+            pitch = pitch + 360.0
+        end
+    end
+
+    angles.x = pitch
+    angles.y = yaw
+    angles.z = 0.0
+end
+
+function Math:Clamp(val, min, max)
+    return math.max(min,math.min(val,max))
+end
+
+function Math:IsInBounds(PointToCheck, first_point, second_point)
+    if((PointToCheck.x >= first_point.x and PointToCheck.x <= second_point.x) and (PointToCheck.y >= first_point.y and PointToCheck.y <= second_point.y)) then
+        return true
+    end
+    return false
+end
+
+function Math:SmoothAngle( from , to , percent ,smoothmethod,shouldRandomize)
+
+    percent = percent or 25
+
+    if shouldRandomize then 
+        percent = math.random(percent)
+        -- print(percent)
+    end
+
+    from:NormalizeTo180()
+    to:NormalizeTo180()
+	local VecDelta = from - to
+
+    
+    VecDelta:NormalizeTo180()
+    -- VecDelta:PrintValueClean()
+    -- print(math.abs(VecDelta.x))
+    -- print(math.abs(VecDelta.y))
+    if smoothmethod == 1 then
+        VecDelta.x = VecDelta.x * ( percent / 100.0 )
+	    VecDelta.y = VecDelta.y * ( percent / 100.0 )
+    else
+        VecDelta.x = Math:Clamp(VecDelta.x,-(percent),(percent))
+	    VecDelta.y = Math:Clamp(VecDelta.y,-(percent),(percent))
+    end
+	
+    
+    VecDelta:NormalizeTo180()
+
+
+
+    local DeltaLast = (from - VecDelta)
+    DeltaLast:NormalizeTo180()
+
+
+	return DeltaLast 
+end
+
+function Math:dist_Segment_to_Segment(s1, s2, k1, k2)
+    local   u = s2 - s1;
+    local    v = k2 - k1;
+    local   w = s1 - k1;
+    local    a = u:Dot(u)
+    local    b = u:Dot(v)
+    local    c = v:Dot(v)
+    local    d = u:Dot(w)
+    local    e = v:Dot(w)
+    local    D = a*c - b*b;  
+    local    sc, sN
+    local   sD = D       
+    local   tc, tN
+    local   tD = D
+
+    if (D < Math.SMALL_NUM) then
+        sN = 0.0;        
+        sD = 1.0;        
+        tN = e;
+        tD = c;
+    else                 
+        sN = (b*e - c*d);
+        tN = (a*e - b*d);
+        if (sN < 0.0) then      
+            sN = 0.0;
+            tN = e;
+            tD = c;
+        elseif (sN > sD) then
+            sN = sD;
+            tN = e + b;
+            tD = c;
+        end
+    end
+
+    if (tN < 0.0) then     
+        tN = 0.0;
+
+        if (-d < 0.0) then
+            sN = 0.0;
+        elseif (-d > a) then
+            sN = sD;
+        else 
+            sN = -d;
+            sD = a;
+        end
+    elseif (tN > tD) then
+        tN = tD;
+
+        if ((-d + b) < 0.0) then
+            sN = 0;
+        elseif ((-d + b) > a) then
+            sN = sD;
+        else 
+            sN = (-d + b);
+            sD = a;
+        end
+    end
+
+    if ( math.abs(sN) < Math.SMALL_NUM )then 
+        sc = 0.0
+    else
+        sc = sN / sD
+    end
+
+    if ( math.abs(tN) < Math.SMALL_NUM )then 
+        tc = 0.0
+    else
+        tc = tN / tD
+    end
+
+    local dP = w + (u:MultiplySingle(sc)) - (v:MultiplySingle(tc));
+
+    return dP:Length()   
+end
+
+function Math:DoesIntersectCapsule(eyePos, myDir, capsuleA, capsuleB, radius)
+    local endPos = eyePos + (myDir:MultiplySingle(8192.0));
+    local dist = Math:dist_Segment_to_Segment(eyePos, endPos, capsuleA, capsuleB)
+    
+    return dist < radius;
+end
 
 local function GetVirtualFunction(address,index)
     local vtable = ffi.cast("uint32_t**",address)[0]
     return ffi.cast("uint32_t",vtable[index])
  end
+
+local HalfHumanWidth        =   16
+local HalfHumanHeight       =   35.5
+local HumanHeight           =   71
+local HumanEyeHeight        =   62
+local HumanCrouchHeight     =   55
+local HumanCrouchEyeHeight  =   37
 
 ffi.cdef[[
 	uint32_t 	CreateFileA     (const char*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
@@ -66,6 +944,27 @@ local function HasC4(PlayerPointer)
     end
 
 end
+
+--alternatives : convar game_type and game_mode
+local g_GameTypes = ffi.cast("uint32_t",utils.create_interface("matchmaking.dll","VENGINE_GAMETYPES_VERSION002"))
+
+local IGameTypes = {}
+IGameTypes.__index = IGameTypes
+setmetatable(IGameTypes,IGameTypes)
+
+ffi.cdef[[
+    typedef int (__thiscall* GetCurrentGameType_FN) (uint32_t this);
+    typedef int (__thiscall* GetCurrentGameMode_FN) (uint32_t this);
+]]
+
+function IGameTypes:GetCurrentGameType()
+    return ffi.cast("GetCurrentGameType_FN",GetVirtualFunction(g_GameTypes,8))(g_GameTypes)
+end
+
+function IGameTypes:GetCurrentGameMode()
+    return ffi.cast("GetCurrentGameMode_FN",GetVirtualFunction(g_GameTypes,9))(g_GameTypes)
+end
+
 
 local function DumpTable(o)
     if type(o) == 'table' then
@@ -130,6 +1029,8 @@ TimeToMove:set_tooltip("How long you should stay slow walking / scoped / crouchi
 local Target_Dormant = Walkbot_MenuGroup:switch("Target Dormant Player",true)
 Target_Dormant:set_tooltip("Targets non-networked players.")
 
+local Target_TeamMate = Walkbot_MenuGroup:switch("Follow Teammate",false)
+Target_TeamMate:set_tooltip("Targets team-mate,as they usually know where to go,rather than randomly going places.Best used for MM.")
 
 local Aimbot_MenuGroup = ui.create("Aimbot", "Aimbot")
 
@@ -201,6 +1102,12 @@ AutoWeaponSwitch_Switch:set_tooltip("Automatically switches to the best weapon i
 
 local Precomputed_Seeds = {}
 
+-- Render stuff from other callbacks here.
+-- Needs to be transformed to screen position.
+
+local Render_Queue = {
+
+}
 -- returns table of items that needs to be bought
 local function CustomTableIndexFunction(t,i)
     for _,v in ipairs(t) do
@@ -1111,31 +2018,7 @@ function AreaNode:__eq(AnotherNode)
     return self.area.m_id == AnotherNode.area.m_id
 end
 
-local function FindNearestAreaToPlayer(AreaList,player)
 
-    local player_position = Vector3D:NewCustom(player:get_origin())
-
-    local Latest_Distance = math.huge
-    local Nearest_Area = nil
-    for _,Area in ipairs(AreaList) do
-
-        if( #Area.m_connect == 0 )then
-            goto continue
-        end
-
-        if(bit.band(Area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then -- avoid area with jump attributes
-            goto continue  
-        end
-
-        local Distance = Area.m_center:DistToSqr(player_position)
-        if(Distance <= Latest_Distance) then
-            Latest_Distance = Distance
-            Nearest_Area = Area
-        end
-        ::continue::
-    end
-    return Nearest_Area
-end
 
 local function FindLowestScoreInList(List)
     local f = math.huge
@@ -1169,6 +2052,16 @@ local function GetNodeInList(List, Node)
     return nil
 end
 
+local function GetAreaInList(List, Area)
+    for i = 1,#List do
+        local NodeIter = List[i]
+        if(NodeIter.area == Area) then
+            return NodeIter
+        end
+    end
+    return nil
+end
+
 local function IsNodeInList(List,Node)
     for i = 1,#List do
         local NodeIter = List[i]
@@ -1179,24 +2072,64 @@ local function IsNodeInList(List,Node)
     return false
 end
 
+local function IsAreaInList(List,Area)
+    for i = 1,#List do
+        local NodeIter = List[i]
+        if(NodeIter.area == Area) then
+            return true
+        end
+    end
+    return false
+end
+
+
+
 local OpenList = {}
 local ClosedList = {}
 
+local function FindNearestAreaToPlayer(AreaList,player)
+
+    local player_position = Vector3D:NewCustom(player:get_origin())
+
+    local Latest_Distance = math.huge
+    local Nearest_Area = nil
+    for _,Area in ipairs(AreaList) do
+
+        if( #Area.m_connect == 0 )then
+            goto continue
+        end
+
+        if(bit.band(Area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then -- avoid area with jump attributes
+            goto continue  
+        end
+        
+        if IsAreaInList(ClosedList,Area) then
+            goto continue
+        end
+
+        local Distance = Area.m_center:DistToSqr(player_position)
+        if(Distance <= Latest_Distance) then
+            Latest_Distance = Distance
+            Nearest_Area = Area
+        end
+        ::continue::
+    end
+    return Nearest_Area
+end
+
 local LastFoundPlayer = nil
 local function FindNearestPlayer(FromPlayer)
-    -- local PlayerList = EntityList.GetPlayers()
+    local PlayerList = entity.get_players(not(Target_TeamMate:get()),Target_Dormant:get())
 
     local NearestDistance = math.huge
     local NearestPlayer = nil
 
     local FromPlayerRenderOrigin = FromPlayer:get_origin()
     local FromPlayerPos = Vector3D:new(FromPlayerRenderOrigin.x,FromPlayerRenderOrigin.y,FromPlayerRenderOrigin.z)
-
-    entity.get_players(true,Target_Dormant:get(),
-    function(Player) 
     
+    for _,Player in pairs(PlayerList) do
         if Player ~= FromPlayer then
-            if Player:is_alive() and Player:is_enemy() and Player:get_index() ~= LastFoundPlayer and Player.m_fImmuneToGunGameDamageTime == 0 then
+            if Player:is_alive() and Player ~= LastFoundPlayer and Player.m_fImmuneToGunGameDamageTime == 0 then
 
                 local PlayerOrigin = Player:get_origin()
                 local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
@@ -1209,26 +2142,11 @@ local function FindNearestPlayer(FromPlayer)
             end
             
         end
-    
-    
-    
-    end)
-
-
-
-    if(NearestPlayer ~= nil)then
-        LastFoundPlayer = NearestPlayer:get_index()
-    else
-        if LastFoundPlayer ~= nil then
-            local BasePlayer_LastFoundPlayer = entity.get(LastFoundPlayer,false)
-            if BasePlayer_LastFoundPlayer then 
-                if BasePlayer_LastFoundPlayer:is_alive() and BasePlayer_LastFoundPlayer:is_enemy() and BasePlayer_LastFoundPlayer.m_fImmuneToGunGameDamageTime == 0 then
-                    NearestPlayer = BasePlayer_LastFoundPlayer
-                end
-            end
-            
-        end
     end
+    -- print("NearestPlayer : " ,NearestPlayer)
+    -- print("LastFoundPlayer : " ,LastFoundPlayer)
+    LastFoundPlayer = NearestPlayer
+   
     return NearestPlayer
 end
 
@@ -1451,15 +2369,15 @@ local NotMovingTicks = 1
 local CycleAttempt = 1 
 local CycleMethods = 5
 
-
+local DoorOpenTimerTick = nil
 local function BreakBreakablesAndOpenOpenable(cmd,position)
+    local tickrate = 1.0 / globals.tickinterval
 
     local local_player = entity.get_local_player()
     local LocalEyePos = local_player:get_eye_position()
     local LocalEyePosCustom = Vector3D:NewCustom(LocalEyePos)
 
 
-   
     -- ======================For Testing======================
     
     -- local camera_forward = Vector3D:new()
@@ -1483,66 +2401,177 @@ local function BreakBreakablesAndOpenOpenable(cmd,position)
     -- ======================For Testing======================
 
 
-    local PositionAngle = Math:CalcAngle(LocalEyePos,position)
+    -- local PositionAngle = Math:CalcAngle(LocalEyePos,position)
 
-    if not PositionAngle then return end
+    -- if not PositionAngle then return end
 
-    local forward = Vector3D:new()
-    Math:AngleVectors(PositionAngle,forward)
-
-    forward = forward:MultiplySingle(8192.0)
-    forward = forward + LocalEyePosCustom
-
-    local mins = vector( -15, -15, -15);
-    local maxs = vector( 15, 15, 15 );
-
-    local VectorToUse = vector(forward.x,forward.y,forward.z)
-    local traced = utils.trace_hull(LocalEyePos, VectorToUse,mins,maxs,local_player,0x600400B)
+    -- local forward = Vector3D:new()
+    -- Math:AngleVectors(PositionAngle,forward)
 
 
-    if traced.entity and traced.entity[0] then
-        
-        if traced.entity:get_classid() == 143 then
-            local min_entity = traced.entity.m_vecMins
-            local max_entity = traced.entity.m_vecMaxs
-            local origin = traced.entity:get_origin()
+    local mins = vector( -5, -5, -5);
+    local maxs = vector( 5, 5, 5 );
 
-            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,origin)
+    -- forward = forward:MultiplySingle(8192.0)
+    -- forward = forward + LocalEyePosCustom
 
-            if AngleToVectorUse == nil then return end
-        
+    -- local VectorToUse = vector(forward.x,forward.y,forward.z)
+    -- local traced = utils.trace_hull(LocalEyePos, VectorToUse,mins,maxs,local_player,0x46004003)
+    
+    for yaw = 0,360,45 do
+        local NewAngle = Angle:new(0,yaw,0)
+        local ForwardVector = Vector3D:new(0,0,0)
+        Math:AngleVectors(NewAngle,ForwardVector)
+
+        ForwardVector = ForwardVector:MultiplySingle(8192)
+        ForwardVector = ForwardVector + LocalEyePosCustom
+        ForwardVector.z = ForwardVector.z - HalfHumanHeight
+
+        local trace_result = utils.trace_hull(vector(LocalEyePos.x,LocalEyePos.y,LocalEyePos.z - HalfHumanHeight),vector(ForwardVector.x,ForwardVector.y,ForwardVector.z),mins,maxs,local_player,0x46004003)
+
+        if not(trace_result and trace_result.entity and trace_result.entity[0]) then goto continue end
+
+        if trace_result.entity and trace_result.entity[0] then
+
+
+            
+            -- table.insert(Render_Queue,render.world_to_screen(origin))
+    
+            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,ForwardVector)
+    
+            if AngleToVectorUse == nil then goto continue end
             AngleToVectorUse:NormalizeTo180()
-            
-            cmd.forwardmove = 0.0
-            cmd.sidemove = 0.0
-            cmd.view_angles.x = AngleToVectorUse.x
-            cmd.view_angles.y = AngleToVectorUse.y
-
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
-            goto continue
+            if Math:VectorDistance(LocalEyePosCustom,trace_result.end_pos) >= 50 then goto continue end
+            if trace_result.entity:get_classid() == 143 then
+                cmd.forwardmove = 0.0
+                cmd.sidemove = 0.0
+                cmd.upmove = 0.0
+    
+                cmd.view_angles.x = 0.0
+                cmd.view_angles.y = AngleToVectorUse.y 
+                
+                if DoorOpenTimerTick == nil or (math.abs(globals.tickcount - DoorOpenTimerTick) >= (tickrate * 2)) then
+                    print("Opening found door.")
+                    cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
+                    DoorOpenTimerTick = globals.tickcount
+                end
+                
+            elseif IsBreakableEntity(ffi.cast("uint32_t",trace_result.entity[0])) then
+                print("Shooting breakable.")
+                cmd.forwardmove = 0.0
+                cmd.sidemove = 0.0
+                cmd.upmove = 0.0
+    
+                cmd.view_angles.x = AngleToVectorUse.x
+                cmd.view_angles.y = AngleToVectorUse.y
+    
+                cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+            end
+    
+    
         end
+        -- table.insert(Render_Queue,render.world_to_screen(vector(LocalEyePos.x,LocalEyePos.y,LocalEyePos.z - HalfHumanHeight)))
+        table.insert(Render_Queue,render.world_to_screen(trace_result.end_pos))
 
-        if IsBreakableEntity(ffi.cast("uint32_t",traced.entity[0])) then
-            
-            local min_entity = traced.entity.m_vecMins
-            local max_entity = traced.entity.m_vecMaxs
-            local origin = traced.entity:get_origin()
-
-            local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,origin)
-
-            if AngleToVectorUse == nil then return end
-        
-            AngleToVectorUse:NormalizeTo180()
-            
-            cmd.forwardmove = 0.0
-            cmd.sidemove = 0.0
-            cmd.view_angles.x = AngleToVectorUse.x
-            cmd.view_angles.y = AngleToVectorUse.y
-        
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
-        end
         ::continue::
     end
+
+    -- if traced.entity and traced.entity[0] then
+
+    --     local entityMin = traced.entity.m_vecMins
+    --     local entityMax = traced.entity.m_vecMaxs
+    --     local EntityCenterOffset = ( entityMax - entityMin ) * 0.5
+
+    --     local origin = traced.entity:get_origin()
+    --     origin = origin + EntityCenterOffset
+
+    --     local OriginAngle = Angle:new()
+    --     Math:VectorAngles(origin,OriginAngle)
+        
+    --     OriginAngle:NormalizeTo180()
+    --     OriginAngle:PrintValueClean()
+        
+    --     -- table.insert(Render_Queue,render.world_to_screen(origin))
+
+    --     local AngleToVectorUse = Math:CalcAngle(LocalEyePosCustom,origin)
+
+    --     if AngleToVectorUse == nil then return end
+    --     AngleToVectorUse:NormalizeTo180()
+
+    --     if traced.entity:get_classid() == 143 then
+    --         cmd.forwardmove = 0.0
+    --         cmd.sidemove = 0.0
+    --         cmd.upmove = 0.0
+
+    --         cmd.view_angles.x = AngleToVectorUse.x
+    --         cmd.view_angles.y = AngleToVectorUse.y
+
+    --         cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
+    --     elseif IsBreakableEntity(ffi.cast("uint32_t",traced.entity[0])) then
+    --         cmd.forwardmove = 0.0
+    --         cmd.sidemove = 0.0
+    --         cmd.upmove = 0.0
+
+    --         cmd.view_angles.x = AngleToVectorUse.x
+    --         cmd.view_angles.y = AngleToVectorUse.y
+
+    --         cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+    --     end
+
+
+    -- end
+    
+    -- local EntityList = entity.get_entities(nil,false)
+    -- for _,Entity in ipairs(EntityList) do
+
+    --     local entityMin = Entity.m_vecMins
+    --     local entityMax = Entity.m_vecMaxs
+
+    --     if not (entityMin and entityMax) then
+    --         goto continue
+    --     end
+
+    --     local EntityCenterOffset = ( entityMax.z - entityMin.z ) * 0.5
+
+    --     local EntityOrigin = Entity:get_origin()
+    --     EntityOrigin.z = EntityOrigin.z + EntityCenterOffset
+    --     local trace_result = utils.trace_hull(LocalEyePos,EntityOrigin,mins,maxs,local_player,0x46004003)
+
+    --     if not (trace_result and trace_result.entity and trace_result.entity[0] and trace_result.entity:is_visible()) then
+    --         goto continue
+    --     end
+
+    --     local AngleToEntity = Math:CalcAngle(LocalEyePosCustom,EntityOrigin)
+    --     if not AngleToEntity then goto continue end
+
+    --     if trace_result.entity:get_classid() == 143 then
+    --         print(trace_result.fraction)
+    --         print("Found door")
+    --         cmd.forwardmove = 0.0
+    --         cmd.sidemove = 0.0
+    --         cmd.upmove = 0.0
+
+    --         cmd.view_angles.x = AngleToEntity.x
+    --         cmd.view_angles.y = AngleToEntity.y
+
+    --         cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
+    --     elseif IsBreakableEntity(ffi.cast("uint32_t",trace_result.entity[0])) then
+    --         print(trace_result.fraction)
+    --         print("Found breakable")
+    --         cmd.forwardmove = 0.0
+    --         cmd.sidemove = 0.0
+    --         cmd.upmove = 0.0
+
+    --         cmd.view_angles.x = AngleToEntity.x
+    --         cmd.view_angles.y = AngleToEntity.y
+
+    --         cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+    --     end
+
+    --     ::continue::
+    -- end
+
+    
 
 
     
@@ -1581,13 +2610,13 @@ local function ObstacleAvoid(cmd)
 
 
     local NodeToMoveTo = Path[#Path]
-    if NodeToMoveTo then
-        BreakBreakablesAndOpenOpenable(cmd,NodeToMoveTo.area.m_center)
-    end
+    
     
 
     if(NotMovingTicks > 1) then
-        
+        if NodeToMoveTo then
+            BreakBreakablesAndOpenOpenable(cmd,NodeToMoveTo.area.m_center)
+        end
         if( CycleAttempt == 1 )then -- Check attribute flags of areas
             if(bit.band(NodeToMoveTo.area.m_attributeFlags,NavAttributeType.NAV_MESH_JUMP) ~= 0) then
                 cmd.buttons = bit.bor(cmd.buttons,buttons.IN_JUMP) -- Jump
@@ -1622,42 +2651,7 @@ local function ObstacleAvoid(cmd)
     end
 end
 
-local TimeSinceLastSeenEnemy = 0
 
-local function MoveToTarget(cmd)
-    local tickrate = 1.0 / globals.tickinterval
-
-    local local_player = entity.get_local_player()
-    local local_player_pos = local_player:get_origin()
-    local local_weapon = local_player:get_player_weapon()
-    local view_angles = Angle:NewCustom(render.camera_angles())
-
-    local NodeToMoveTo = Path[#Path]
-
-    local AngleToNode = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
-
-    if AngleToNode == nil then return end
-
-    view_angles.x = 0.0
-    AngleToNode.x = 0.0
-    view_angles.z = 0.0
-    AngleToNode.z = 0.0
-    AngleToNode = (view_angles - AngleToNode)
-
-
-
-    local forward = Vector3D:new()
-
-
-    Math:AngleVectors(AngleToNode,forward)
-
-    forward = forward:MultiplySingle(450)
-
-
-    cmd.forwardmove = forward.x
-    cmd.sidemove = forward.y
-
-end
 
 local function PrecomputeSeed()
 	
@@ -1902,7 +2896,7 @@ local function BeMoreAccurate(cmd)
 
     local local_weapon = local_player:get_player_weapon()
 
-    if not local_weapon or local_weapon:get_weapon_reload() ~= -1 then 
+    if not local_weapon or local_weapon:get_weapon_reload() ~= -1 then
         return
     end
 
@@ -1933,123 +2927,170 @@ local function BeMoreAccurate(cmd)
     cmd.sidemove = cmd.sidemove * kys
     cmd.upmove = cmd.upmove * kys
 
-
+    if  Aimbot_AutoScope_Switch:get()                                                           and 
+        local_weapon                                                                            and 
+        local_weapon.m_zoomLevel                    == 0                                        and 
+        local_weapon:get_weapon_info().weapon_type  == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE     and 
+        bit.band(cmd.buttons,buttons.IN_ATTACK2)    == 0                                        and
+        bit.band(cmd.buttons,buttons.IN_ATTACK)     == 0
+    then
+        cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
+    end
     
 end
 
+local TimeSinceLastSeenEnemy = 0
+
+local function MoveToTarget(cmd)
+    
+    local tickrate = 1.0 / globals.tickinterval
+
+    local local_player = entity.get_local_player()
+    local local_player_pos = local_player:get_origin()
+    local local_weapon = local_player:get_player_weapon()
+    local view_angles = Angle:NewCustom(render.camera_angles())
+
+    local NodeToMoveTo = Path[#Path]
+
+    local AngleToNode = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
+
+    if AngleToNode == nil then return end
+
+    view_angles.x = 0.0
+    AngleToNode.x = 0.0
+    view_angles.z = 0.0
+    AngleToNode.z = 0.0
+    AngleToNode = (view_angles - AngleToNode)
+
+
+
+    local forward = Vector3D:new()
+
+
+    Math:AngleVectors(AngleToNode,forward)
+
+    forward = forward:MultiplySingle(450)
+
+
+    cmd.forwardmove = forward.x
+    cmd.sidemove = forward.y
+
+    if TimeSinceLastSeenEnemy < tickrate * TimeToMove:get() or TimeSinceLastSeenEnemy == 0 then
+        BeMoreAccurate(cmd)
+    end
+end
 local RecoilScale = cvar.weapon_recoil_scale
 
 local LatestTargetAngle = Angle:new()
 local LatestAngle = Angle:NewCustom(render.camera_angles())
+local TargetInfo = nil
 
-
-local function Aimbot(cmd)
-
-    if not Aimbot_Enable:get() then return end
+local function PrepareTargetAngle(cmd)
     local tickrate = 1.0 / globals.tickinterval
-
-    
-    local NodeToMoveTo = Path[#Path]
 
     local local_player = entity.get_local_player()
     local local_player_pos = local_player:get_eye_position()
     local local_weapon = local_player:get_player_weapon()
 
-    local local_aimpunch = Angle:NewCustom(local_player.m_aimPunchAngle)
-    local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:float())
+    local NodeToMoveTo = Path[#Path]
 
     local TargetPlayerAndHitbox = Aimbot__FindNearestPlayer(local_player)
 
-    if TargetPlayerAndHitbox[1] ~= nil and TargetPlayerAndHitbox[2] ~= nil and Vector3D:IsValid(local_player_pos) then 
-        
-        TimeSinceLastSeenEnemy = 0
-        BeMoreAccurate(cmd) -- When seen enemy,always try to be more accurate
-
-        if  Aimbot_AutoScope_Switch:get()                                                       and 
-            local_weapon                                                                        and 
-            local_weapon.m_zoomLevel == 0                                                       and 
-            local_weapon:get_weapon_info().weapon_type == CSWeaponType.WEAPONTYPE_SNIPER_RIFLE  and 
-            bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 
-        then
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
-        end
-
-        local TargetHitbox = TargetPlayerAndHitbox[1]:get_hitbox_position(TargetPlayerAndHitbox[2])
-        
-        if Vector3D:IsValid(TargetHitbox) then
-            local AngleToTarget = Math:CalcAngle(local_player_pos,TargetHitbox)
-            if(AngleToTarget ~= nil)then 
-                LatestTargetAngle = AngleToTarget - local_aimpunch
-            end
-        end
-    else
-        if NodeToMoveTo and TimeSinceLastSeenEnemy > tickrate * TimeToMove:get() then
-            if Vector3D:IsValid(NodeToMoveTo.area.m_center)then
-                local AngleToTarget = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
-
-                if(AngleToTarget ~= nil)then 
-                    LatestTargetAngle = AngleToTarget
-                    LatestTargetAngle.x = 0.00
-                    LatestTargetAngle.z = 0.00
+    if Vector3D:IsValid(local_player_pos) then
+        if TargetPlayerAndHitbox[1] and TargetPlayerAndHitbox[2] then
+            BeMoreAccurate(cmd)
+            TargetInfo = TargetPlayerAndHitbox
+            TimeSinceLastSeenEnemy = 0
+            local local_aimpunch = Angle:NewCustom(local_player.m_aimPunchAngle)
+            local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:float())
+    
+            local TargetHitbox = TargetPlayerAndHitbox[1]:get_hitbox_position(TargetPlayerAndHitbox[2])
+            
+            if Vector3D:IsValid(TargetHitbox) then
+                local AngleToTarget = Math:CalcAngle(local_player_pos,TargetHitbox)
+                if (AngleToTarget ~= nil) then
+                    LatestTargetAngle = AngleToTarget - local_aimpunch
                 end
             end
-            
+        else
+            TargetInfo = nil
+            if NodeToMoveTo and TimeSinceLastSeenEnemy > (tickrate * TimeToMove:get()) then
+                if Vector3D:IsValid(NodeToMoveTo.area.m_center) then
+                    local AngleToTarget = Math:CalcAngle(local_player_pos,NodeToMoveTo.area.m_center)
+                    if (AngleToTarget ~= nil) then
+                        LatestTargetAngle = AngleToTarget
+                        LatestTargetAngle.x = 0.00
+                        LatestTargetAngle.z = 0.00
+                    end
+                end
+            end
         end
-
     end
+end
+
+
+local function Aimbot(cmd)
+    local tickrate = 1.0 / globals.tickinterval
+    local local_player = entity.get_local_player()
+    local local_player_pos = local_player:get_eye_position()
+    local local_weapon  = local_player:get_player_weapon()
+
+    local local_aimpunch = Angle:NewCustom(local_player.m_aimPunchAngle)
+    local_aimpunch = local_aimpunch:MultiplySingle(RecoilScale:float())
+
+
     LatestAngle = Math:SmoothAngle(LatestAngle,LatestTargetAngle,Aimbot_Speed:get(),GetIndexFromSelectedCombo(Aimbot_Smoothing_Method_Combo_Table,Aimbot_Smoothing_Method:get()),Aimbot_Randomize_Speed:get())
-
     LatestAngle:NormalizeTo180()
-    
 
-    
     cmd.view_angles.x = LatestAngle.x
     cmd.view_angles.y = LatestAngle.y
-    
-    local Hitchance_Method = GetIndexFromSelectedCombo(Aimbot_Hitchance_Method_Combo_Table,Aimbot_Hitchance_Method:get())
+  
+    if TargetInfo then
+        local Hitchance_Method = GetIndexFromSelectedCombo(Aimbot_Hitchance_Method_Combo_Table,Aimbot_Hitchance_Method:get())
 
-    if Hitchance_Method == 1 then
-        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:NewCustom(cmd.view_angles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchancePrecomputed(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
-            if Aimbot_Enforce_Hitbox:get() then
-                cmd.view_angles.x = LatestTargetAngle.x
-                cmd.view_angles.y = LatestTargetAngle.y
+        if TargetInfo[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:NewCustom(cmd.view_angles),local_player,TargetInfo[1]) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
+            if Hitchance_Method == 1 then
+                if CheckHitchancePrecomputed(LatestAngle,TargetInfo[1]) then
+                    if Aimbot_Enforce_Hitbox:get() then
+                        cmd.view_angles.x = LatestTargetAngle.x
+                        cmd.view_angles.y = LatestTargetAngle.y
+                    end
+                    cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+                end
+            elseif Hitchance_Method == 2 then
+                if CheckHitchanceRandom(cmd,LatestAngle,TargetInfo[1]) then
+                    if Aimbot_Enforce_Hitbox:get() then
+                        cmd.view_angles.x = LatestTargetAngle.x
+                        cmd.view_angles.y = LatestTargetAngle.y
+                    end
+                    cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+                end
+            else
+                if CheckHitchanceUniform(LatestAngle,TargetInfo[1]) then
+                    if Aimbot_Enforce_Hitbox:get() then
+                        cmd.view_angles.x = LatestTargetAngle.x
+                        cmd.view_angles.y = LatestTargetAngle.y
+                    end
+                    cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+                end
             end
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
+
         end
-    elseif Hitchance_Method == 2 then
-        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:NewCustom(cmd.view_angles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceRandom(cmd,LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
-            if Aimbot_Enforce_Hitbox:get() then
-                cmd.view_angles.x = LatestTargetAngle.x
-                cmd.view_angles.y = LatestTargetAngle.y
-            end
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
-        end
-    else
-        if TargetPlayerAndHitbox[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:NewCustom(cmd.view_angles),local_player,TargetPlayerAndHitbox[1]) and CheckHitchanceUniform(LatestAngle,TargetPlayerAndHitbox[1] ) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
-            if Aimbot_Enforce_Hitbox:get() then
-                cmd.view_angles.x = LatestTargetAngle.x
-                cmd.view_angles.y = LatestTargetAngle.y
-            end
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
-        end
+        
     end
-    
 
     if (TimeSinceLastSeenEnemy > tickrate * TimeToMove:get()) then
         if Aimbot_AutoUnscope_Switch:get() and local_weapon and local_weapon.m_zoomLevel ~= 0 and bit.band(cmd.buttons,buttons.IN_ATTACK) == 0 then 
             cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK2)
         end
-    else
-        BeMoreAccurate(cmd) -- AFTER seen enemy,we can still be more accurate just in case they peek again in a short time span.
-    end
-     
-    if Aimbot_AutoReload_Switch:get() and local_weapon and local_weapon:get_weapon_reload() == -1 and bit.band(cmd.buttons,buttons.IN_ATTACK) == 0 then
-        local clip = local_weapon.m_iClip1
-        local max_clip = local_weapon:get_weapon_info().max_clip1
-        local current_clip_percentage = clip / max_clip
-
-        if(current_clip_percentage < ( Aimbot_AutoReload:get() / 100 ) ) then
-            cmd.buttons = bit.bor(cmd.buttons,buttons.IN_RELOAD)
+        if Aimbot_AutoReload_Switch:get() and local_weapon and local_weapon:get_weapon_reload() == -1 and bit.band(cmd.buttons,buttons.IN_ATTACK) == 0 then
+            local clip = local_weapon.m_iClip1
+            local max_clip = local_weapon:get_weapon_info().max_clip1
+            local current_clip_percentage = clip / max_clip
+    
+            if(current_clip_percentage < ( Aimbot_AutoReload:get() / 100 ) ) then
+                cmd.buttons = bit.bor(cmd.buttons,buttons.IN_RELOAD)
+            end
         end
     end
 
@@ -2066,7 +3107,9 @@ events.createmove:set(function(cmd)
     if ( bit.band(cmd.buttons,buttons.IN_ATTACK,buttons.IN_ATTACK2) ~= 0 ) then
         return
     end
-
+    
+    TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 230400)
+    
     local tickrate = 1.0 / globals.tickinterval
 
     local game_rules = entity.get_game_rules()
@@ -2150,7 +3193,11 @@ events.createmove:set(function(cmd)
     end
     
     if INavFile.m_isLoaded and not( not utils.net_channel().is_loopback and m_bWarmupPeriod) then -- m_bWarmupPeriod doesnt get set correctly on local server
-
+        if Aimbot_Enable:get() and bit.band(cmd.buttons,buttons.IN_ATTACK) == 0 then 
+            PrepareTargetAngle(cmd)
+            Aimbot(cmd)
+        end
+        
         if not m_bFreezePeriod  then 
             if(#Path == 0) then
                 if (#OpenList == 0) then
@@ -2163,7 +3210,8 @@ events.createmove:set(function(cmd)
                     cmd.upmove = 0.0
                 end
             else
-
+                
+                
                 MoveToTarget(cmd)
                 if TimeSinceLastSeenEnemy > tickrate * TimeToMove:get() then
                     ObstacleAvoid(cmd)
@@ -2172,13 +3220,11 @@ events.createmove:set(function(cmd)
             end
             
         end
-        if (bit.band(cmd.buttons,buttons.IN_ATTACK) == 0)then 
-            Aimbot(cmd)
-        end
+        
 
     end
 
-    TimeSinceLastSeenEnemy = math.max(1,(TimeSinceLastSeenEnemy + 1) % 6400)
+    
 
 
     -- Prevent IN_ATTACK and IN_ATTACK2 in same tick
@@ -2249,6 +3295,13 @@ local function AutoReconnect()
 end
 events.post_render:set(function()
     local tickrate = 1.0 / globals.tickinterval
+    local local_player = entity.get_local_player()
+    if globals.tickcount % tickrate == 0  then
+        if local_player and not (local_player.m_iTeamNum == 2 or local_player.m_iTeamNum == 3 ) and (IGameTypes:GetCurrentGameMode() == 2 and IGameTypes:GetCurrentGameType() == 1) then
+            print("Joining team")
+            utils.console_exec("jointeam 3 2 1;")
+        end
+    end
     if( globals.tickcount % tickrate * 5 == 0 ) then
         AutoReconnect()
         AutoQueue()
@@ -2257,6 +3310,12 @@ end)
 
 events.render:set(
     function()
+
+        for _,Renderable in ipairs(Render_Queue) do
+            render.circle(Renderable, color(255,255,255,255), 10, 0,  1.0)
+        end
+        Render_Queue = {}
+
         if #Path == 0 then
             if(CurrentNode ~= nil) then
                 local localPath = {}
