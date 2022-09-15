@@ -878,12 +878,180 @@ local function GetVirtualFunction(address,index)
     return ffi.cast("uint32_t",vtable[index])
  end
 
+ local function vtable_entry(instance, index, type)
+    return ffi.cast(type, (ffi.cast("void***", instance)[0])[index])
+end
+
+local function vtable_thunk(index, typestring)
+    local t = ffi.typeof(typestring)
+    return function(instance, ...)
+        assert(instance ~= nil)
+        if instance then
+            return vtable_entry(instance, index, t)(instance, ...)
+        end
+    end
+end
+
+local function vtable_bind(module, interface, index, typestring)
+    local instance = utils.create_interface(module, interface) or error("invalid interface")
+    local fnptr = vtable_entry(instance, index, ffi.typeof(typestring)) or error("invalid vtable")
+    return function(...)
+        return fnptr(tonumber(ffi.cast("void***", instance)), ...)
+    end
+end
+
+local filesystem = utils.create_interface("filesystem_stdio.dll", "VBaseFileSystem011")
+local filesystem_class = ffi.cast(ffi.typeof("void***"), filesystem)
+local filesystem_vftbl = filesystem_class[0]
+
+local func_read_file = ffi.cast("int (__thiscall*)(void*, void*, int, void*)", filesystem_vftbl[0])
+local func_write_file = ffi.cast("int (__thiscall*)(void*, void const*, int, void*)", filesystem_vftbl[1])
+
+local func_open_file = ffi.cast("void* (__thiscall*)(void*, const char*, const char*, const char*)", filesystem_vftbl[2])
+local func_close_file = ffi.cast("void (__thiscall*)(void*, void*)", filesystem_vftbl[3])
+
+local func_get_file_size = ffi.cast("unsigned int (__thiscall*)(void*, void*)", filesystem_vftbl[7])
+local func_file_exists = ffi.cast("bool (__thiscall*)(void*, const char*, const char*)", filesystem_vftbl[10])
+
+local full_filesystem = utils.create_interface("filesystem_stdio.dll", "VFileSystem017")
+local full_filesystem_class = ffi.cast(ffi.typeof("void***"), full_filesystem)
+local full_filesystem_vftbl = full_filesystem_class[0]
+
+local func_add_search_path = ffi.cast("void (__thiscall*)(void*, const char*, const char*, int)", full_filesystem_vftbl[11])
+local func_remove_search_path = ffi.cast("bool (__thiscall*)(void*, const char*, const char*)", full_filesystem_vftbl[12])
+
+local func_remove_file = ffi.cast("void (__thiscall*)(void*, const char*, const char*)", full_filesystem_vftbl[20])
+local func_rename_file = ffi.cast("bool (__thiscall*)(void*, const char*, const char*, const char*)", full_filesystem_vftbl[21])
+local func_create_dir_hierarchy = ffi.cast("void (__thiscall*)(void*, const char*, const char*)", full_filesystem_vftbl[22])
+local func_is_directory = ffi.cast("bool (__thiscall*)(void*, const char*, const char*)", full_filesystem_vftbl[23])
+
+local func_find_first = ffi.cast("const char* (__thiscall*)(void*, const char*, int*)", full_filesystem_vftbl[32])
+local func_find_next = ffi.cast("const char* (__thiscall*)(void*, int)", full_filesystem_vftbl[33])
+local func_find_is_directory = ffi.cast("bool (__thiscall*)(void*, int)", full_filesystem_vftbl[34])
+local func_find_close = ffi.cast("void (__thiscall*)(void*, int)", full_filesystem_vftbl[35])
+
+local native_GetGameDirectory = vtable_bind("engine.dll", "VEngineClient014", 36, "const char*(__thiscall*)(void*)")
+
+local MODES = {
+    ["r"] = "r",
+    ["w"] = "w",
+    ["a"] = "a",
+    ["r+"] = "r+",
+    ["w+"] = "w+",
+    ["a+"] = "a+",
+    ["rb"] = "rb",
+    ["wb"] = "wb",
+    ["ab"] = "ab",
+    ["rb+"] = "rb+",
+    ["wb+"] = "wb+",
+    ["ab+"] = "ab+",
+}
+
+local FileSystem = {}
+FileSystem.__index = FileSystem
+
+function FileSystem.exists(file, path_id)
+    return func_file_exists(filesystem_class, file, path_id)
+end
+
+function FileSystem.rename(old_path, new_path, path_id)
+    func_rename_file(full_filesystem_class, old_path, new_path, path_id)
+end
+
+function FileSystem.remove(file, path_id)
+    func_remove_file(full_filesystem_class, file, path_id)
+end
+
+function FileSystem.create_directory(path, path_id)
+    func_create_dir_hierarchy(full_filesystem_class, path, path_id)
+end
+
+function FileSystem.is_directory(path, path_id)
+    return func_is_directory(full_filesystem_class, path, path_id)
+end
+
+function FileSystem.find_first(path)
+    local handle = ffi.new("int[1]")
+    local file = func_find_first(full_filesystem_class, path, handle)
+    if file == ffi.NULL then return nil end
+
+    return handle, ffi.string(file)
+end
+
+function FileSystem.find_next(handle)
+    local file = func_find_next(full_filesystem_class, handle)
+    if file == ffi.NULL then return nil end
+
+    return ffi.string(file)
+end
+
+function FileSystem.find_is_directory(handle)
+    return func_find_is_directory(full_filesystem_class, handle)
+end
+
+function FileSystem.find_close(handle)
+    func_find_close(full_filesystem_class, handle)
+end
+
+function FileSystem.add_search_path(path, path_id, type)
+    func_add_search_path(full_filesystem_class, path, path_id, type)
+end
+
+function FileSystem.remove_search_path(path, path_id)
+    func_remove_search_path(full_filesystem_class, path, path_id)
+end
+
+function FileSystem.get_game_dir()
+    return ffi.string(native_GetGameDirectory())
+end
+
+function FileSystem.open(file, mode, path_id)
+    if not MODES[mode] then error("Invalid mode!") end
+    local self = setmetatable({
+        file = file,
+        mode = mode,
+        path_id = path_id,
+        handle = func_open_file(filesystem_class, file, mode, path_id)
+    }, FileSystem)
+
+    return self
+end
+
+function FileSystem:get_size()
+    return func_get_file_size(filesystem_class, self.handle)
+end
+
+function FileSystem:write(buffer)
+    func_write_file(filesystem_class, buffer, #buffer, self.handle)
+end
+
+function FileSystem:readAsRaw()
+    local size = self:get_size()
+    local output = ffi.new("char[?]", size + 1)
+    func_read_file(filesystem_class, output, size, self.handle)
+
+    return output
+end
+
+function FileSystem:readAsString()
+    local size = self:get_size()
+    local output = ffi.new("char[?]", size + 1)
+    func_read_file(filesystem_class, output, size, self.handle)
+
+    return ffi.string(output)
+end
+
+function FileSystem:close()
+    func_close_file(filesystem_class, self.handle)
+end
+
 local HalfHumanWidth        =   16
 local HalfHumanHeight       =   35.5
 local HumanHeight           =   71
 local HumanEyeHeight        =   62
 local HumanCrouchHeight     =   55
 local HumanCrouchEyeHeight  =   37
+
 
 ffi.cdef[[
 	uint32_t 	CreateFileA     (const char*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
@@ -1213,7 +1381,7 @@ local function AutoBuy()
             end
         end
     end
-    print(final_command)
+    -- print(final_command)
     utils.console_exec(final_command)
 end
 
@@ -1905,17 +2073,17 @@ function INavFile:PostLoad()
 end
 
 function INavFile:Load(Buffer)
-    local FunctionName = "INavFile:Load :"
+    local FunctionName = "INavFile:Load"
 
     self.m_magic = ffi.cast("uint32_t*",Buffer:Read(4))[0]
     if(self.m_magic ~= 0xFEEDFACE) then
-        print(FunctionName,"File could not be verified against magic")
+        print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\aFF0000".. FunctionName .. " : File could not be verified against magic")
         return false
     end
 
     self.m_version = ffi.cast("uint32_t*",Buffer:Read(4))[0]
     if(self.m_version ~= 16) then
-        print(FunctionName,"File version mismatch")
+        print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\aFF0000".. FunctionName .. " : File version mismatch")
         return false
     end
 
@@ -1955,43 +2123,39 @@ function INavFile:Load(Buffer)
     return true
 end
 local function LoadMap(MapName)
-
+    
     local MapConcattedWithDirectory = common.get_game_directory() .. "\\maps\\" .. MapName .. ".nav"
 
-    local fileHandle = ffi.C.CreateFileA(MapConcattedWithDirectory,0x10000000,0x1,0,4,0x80,0)
-
-    if (ffi.C.GetFileAttributesA(MapConcattedWithDirectory) == 0xFFFFFFFF ) then
-        print(".nav file for this map doesn't exist.")
-        ffi.C.CloseHandle(fileHandle)
+    if FileSystem.exists(MapConcattedWithDirectory,"GAME") then
+        print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\a00FF00 Nav mesh file found : " .. MapConcattedWithDirectory)
+    else
+        print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\aFF0000 Nav mesh file doesn\'t exist ,generate one first!")
         INavFile.m_isLoaded = false
         return
     end
 
-    local filesize = ffi.C.GetFileSize(fileHandle,0)
+    local file = FileSystem.open(MapConcattedWithDirectory , "r","GAME")
 
-    if( filesize == 0 )then
-        print(".nav file is empty.")
-        ffi.C.CloseHandle(fileHandle)
+    if file:get_size() == 0 then
+        print_chat("\a3244A8[\aBAAE3FWalkbot\a3244A8]\aFF0000 Nav mesh file is empty, re-generate it again.")
         INavFile.m_isLoaded = false
+        file:close()
         return
     end
 
-    local buffer = ffi.typeof("unsigned char[?]")(filesize + 1)
-    local NumberOfBytesRead = ffi.new("uint32_t[1]",{})
-
-    ffi.C.ReadFile(fileHandle,buffer,filesize, NumberOfBytesRead,0)
-    ffi.C.CloseHandle(fileHandle)
-
-    local CustomBuffer = FileBuffer:Create(0,buffer,filesize)
+    local CustomBuffer = FileBuffer:Create(0,file:readAsRaw(),file:get_size() + 1)
     INavFile:Reset()
     if(not INavFile:Load(CustomBuffer))then
-        print(".nav file is invalid")
+        print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\aFF0000 .nav file is invalid")
         INavFile.m_isLoaded = false
+        file:close()
         return
     end
+    file:close()
     INavFile.m_isLoaded = true
 end
 
+-- LoadMap("de_dust2")
 
 local AreaNode = {
     parent = nil,
@@ -2094,7 +2258,6 @@ local function FindNearestAreaToPlayer(AreaList,player)
     local Latest_Distance = math.huge
     local Nearest_Area = nil
     for _,Area in ipairs(AreaList) do
-
         if( #Area.m_connect == 0 )then
             goto continue
         end
@@ -2245,7 +2408,7 @@ local function PrepareToFindAnotherNode()
 
 
     if (ChosenPlayer ~= nil) then
-        print("Targetting player : " , ChosenPlayer:get_name())
+        print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\a85BA3F Targetting player : " .. ChosenPlayer:get_name())
         EndArea = FindNearestAreaToPlayer(INavFile.m_areas,ChosenPlayer)
     else
         EndArea = INavFile:GetNavAreaByID(math.random(1,#INavFile.m_areas))
@@ -2451,13 +2614,13 @@ local function BreakBreakablesAndOpenOpenable(cmd,position)
                 cmd.view_angles.y = AngleToVectorUse.y 
                 
                 if DoorOpenTimerTick == nil or (math.abs(globals.tickcount - DoorOpenTimerTick) >= (tickrate * 2)) then
-                    print("Opening found door.")
+                    print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\a21ccbe Opening found door.")
                     cmd.buttons = bit.bor(cmd.buttons,buttons.IN_USE)
                     DoorOpenTimerTick = globals.tickcount
                 end
                 
             elseif IsBreakableEntity(ffi.cast("uint32_t",trace_result.entity[0])) then
-                print("Shooting breakable.")
+                print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\a21ccbe Shooting breakable.")
                 cmd.forwardmove = 0.0
                 cmd.sidemove = 0.0
                 cmd.upmove = 0.0
@@ -3179,14 +3342,14 @@ events.createmove:set(function(cmd)
 
     if (globals.tickcount % tickrate == 0) then
         if (common.get_map_data().shortname ~= LastMapName) then
-            print("Map changed.")
+            print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\a21ccbe Map changed.")
             INavFile.m_isLoaded = false
             TriggerPrepareToFindAnotherNode()
         end
     end
 
     if (not INavFile.m_isLoaded) then
-        print("LoadMap : " .. common.get_map_data().shortname)
+        print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\a21ccbe LoadMap : " .. common.get_map_data().shortname)
         LoadMap(common.get_map_data().shortname)
         LastMapName = common.get_map_data().shortname
         return
@@ -3298,7 +3461,7 @@ events.post_render:set(function()
     local local_player = entity.get_local_player()
     if globals.tickcount % tickrate == 0  then
         if local_player and not (local_player.m_iTeamNum == 2 or local_player.m_iTeamNum == 3 ) and (IGameTypes:GetCurrentGameMode() == 2 and IGameTypes:GetCurrentGameType() == 1) then
-            print("Joining team")
+            print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\a21ccbe Joining team.")
             utils.console_exec("jointeam 3 2 1;")
         end
     end
