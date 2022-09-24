@@ -76,6 +76,7 @@ function Component:new()
 end
 
 function Component:AddChild(ChildComponent)
+    print("Component:AddChild()")
     ChildComponent.ParentComponent = self
     self.IsParent = true
     ChildComponent.IsChild = true
@@ -214,6 +215,19 @@ function Component:Tick()
 
 end
 
+
+
+local SliderGroup = {
+    Count = 0,
+    DistanceBetweenSliders = 1,
+    ContentSpaceSize = 0,
+    ScrollOffset = 0,
+    Scrollbar = nil,
+    Max_Height = 0,
+    MinimumSize = 0
+}
+SliderGroup.__index = SliderGroup
+
 local SliderComponent = {
     size                    = vector(30,100,0),
     Index                   = 1,
@@ -226,8 +240,70 @@ local SliderComponent = {
     LineThickness           = 3.0,
     CircleRadius            = 5.0
 }
-
 SliderComponent.__index = SliderComponent
+
+function SliderGroup:new()
+
+    setmetatable(SliderGroup,Component)
+    local Object = Component:new()
+    setmetatable(Object,SliderGroup)
+
+    Object.size = vector(Component.size.x - 100,(Component.size.y/2)-50,0.0)
+    Object.relative_position = vector(50,Component.size.y/2,0.0)
+
+    return Object
+end
+
+function SliderGroup:AddChild(ChildComponent)
+    Component.AddChild(self,ChildComponent)
+    -- ChildComponent:OnAddChild()
+end
+
+function SliderGroup:Draw()
+    print("SliderGroup:Draw()")
+    --render.push_clip_rect(self.position, self.endbound_position,false)
+    render.rect(self.position, self.endbound_position, color(0,0,0,255),5)
+
+    for _,ChildComponent in ipairs(self.ChildComponents) do
+        ChildComponent:Draw()
+    end
+    --render.pop_clip_rect()
+end
+
+
+
+function SliderGroup:OnClick()
+    print("SliderGroup:OnClick()")
+    local mouse_pos = ui.get_mouse_position()
+
+    self.IsClicked = true
+    self.CanHold = true
+    GlobalMouseState.IsClicked = true
+
+    self.DraggingPosition.x = mouse_pos.x - self:GetMostTopParent().position.x
+    self.DraggingPosition.y = mouse_pos.y - self:GetMostTopParent().position.y
+end
+
+function SliderGroup:OnHold()
+    print("SliderGroup:OnHold()")
+    
+    local mouse_pos = ui.get_mouse_position()
+    self:GetMostTopParent().position.x = mouse_pos.x - self.DraggingPosition.x
+    self:GetMostTopParent().position.y = mouse_pos.y - self.DraggingPosition.y
+
+end
+
+function SliderGroup:UpdateRelativePositions()
+    self.position = self.ParentComponent.position + self.relative_position
+    Component.UpdateRelativePositions(self) 
+    self.ContentSpaceSize = math.max(math.abs(self.endbound_position.x - self.position.x),(((SliderComponent.size.x) + self.DistanceBetweenSliders) * SliderGroup.Count ))
+    print("SliderGroup:UpdateRelativePositions()")
+    print(" self.ContentSpaceSize " ,self.ContentSpaceSize)
+end
+
+
+
+
 
 function SliderComponent:new()
 
@@ -235,6 +311,7 @@ function SliderComponent:new()
     local Object = Component:new()
     setmetatable(Object,SliderComponent)
 
+    Object.Index                = 1
     Object.size                 = vector(30,100,0)
     Object.relative_position    = vector(5,5,0)
     Object.MinimumValue         = 0.00
@@ -252,6 +329,8 @@ end
 
 function SliderComponent:Draw()
     --print("SliderComponent:Draw()")
+    if self:ShouldTick() then return end
+
      render.rect(self.position, self.endbound_position, color(255,255,0,255))
 
 
@@ -269,7 +348,7 @@ end
 
 function SliderComponent:OnHold()
     --print("SliderComponent:OnHold()")
-
+    if not self:ShouldTick() then return end
     local mouse_pos = ui.get_mouse_position()
 
     local CurrentPosition = math.max(self.MaximumPosition.y,math.min(mouse_pos.y,self.MinimumPosition.y))
@@ -280,16 +359,28 @@ end
 
 function SliderComponent:OnAddChild()
     --ParentComponent = SliderGroup
-    self.Index = self.ParentComponent.Count
-    self.ParentComponent.Count = self.ParentComponent.Count + 1
+    print("SliderComponent:OnAddChild()")
+    self.Index = SliderGroup.Count
+
+    local OffsetFromStart = (self.Index * (self.ParentComponent.DistanceBetweenSliders + self.size.x))
+
+    if OffsetFromStart <= self.ParentComponent.size.x then
+        self.ParentComponent.MinimumSize = OffsetFromStart - (self.ParentComponent.DistanceBetweenSliders + self.size.x)
+    end
+    SliderGroup.Count = SliderGroup.Count + 1
+    
+    
+
+
+    print(SliderGroup.Count)
 end
 
 function SliderComponent:UpdateRelativePositions()
     --Component.UpdateRelativePositions(self) -- call original ::BaseClass
     --print("SliderComponent:UpdateRelativePositions()")
-
+    print(SliderGroup.Count)
+    print("self.Index : ",self.Index)
     local mouse_pos = ui.get_mouse_position()
-
     local OffsetFromStart = (self.Index * (self.ParentComponent.DistanceBetweenSliders + self.size.x))
     --print("Distance between slider : ",self.ParentComponent.ContentSpaceSize)
     self.position.x       = self.ParentComponent.position.x + OffsetFromStart - self.ParentComponent.ScrollOffset
@@ -320,74 +411,14 @@ function SliderComponent:UpdateRelativePositions()
 
 end
 
-local SliderGroup = {
-    Count = 0,
-    DistanceBetweenSliders = 10,
-    ContentSpaceSize = 0,
-    ScrollOffset = 0,
-    Scrollbar = nil,
-    Max_Height = 0
-}
-
-SliderGroup.__index = SliderGroup
-
-function SliderGroup:new()
-
-    setmetatable(SliderGroup,Component)
-    local Object = Component:new()
-    setmetatable(Object,SliderGroup)
-
-    Object.size = vector(Component.size.x - 100,(Component.size.y/2)-50,0.0)
-    Object.relative_position = vector(50,Component.size.y/2,0.0)
-
-    return Object
-end
-
-function SliderGroup:AddChild(ChildComponent)
-    Component.AddChild(self,ChildComponent)
-    ChildComponent:OnAddChild()
-end
-
-function SliderGroup:Draw()
-    print("SliderGroup:Draw()")
-    --render.push_clip_rect(self.position, self.endbound_position,false)
-    render.rect(self.position, self.endbound_position, color(0,0,0,255),5)
-
-    for _,ChildComponent in ipairs(self.ChildComponents) do
-        ChildComponent:Draw()
-    end
-    --render.pop_clip_rect()
-end
-
-
-
-function SliderGroup:OnClick()
-    print("SliderGroup:OnClick()")
-    local mouse_pos = ui.get_mouse_position()
-
-    self.IsClicked = true
-    self.CanHold = true
-    GlobalMouseState.IsClicked = true
-
-    self.DraggingPosition.x = mouse_pos.x - self:GetMostTopParent().position.x
-    self.DraggingPosition.y = mouse_pos.y - self:GetMostTopParent().position.y
-end
-
-function SliderGroup:OnHold()
-    print("SliderGroup:OnHold()")
-
-    local mouse_pos = ui.get_mouse_position()
-    self:GetMostTopParent().position.x = mouse_pos.x - self.DraggingPosition.x
-    self:GetMostTopParent().position.y = mouse_pos.y - self.DraggingPosition.y
-
-end
-
-function SliderGroup:UpdateRelativePositions()
-    self.position = self.ParentComponent.position + self.relative_position
-    Component.UpdateRelativePositions(self)
-    self.ContentSpaceSize = math.max(math.abs(self.endbound_position.x - self.position.x),( (#self.ChildComponents) * ( SliderComponent.size.x + self.DistanceBetweenSliders) ) )
-    print("SliderGroup:UpdateRelativePositions()")
-    print(" self.ContentSpaceSize " ,self.ContentSpaceSize)
+function SliderComponent:ShouldTick()
+    print("self.position : ",self.position)
+    print("self.ParentComponent.position : ",self.ParentComponent.position)
+    return (    self.position.x > self.ParentComponent.position.x and 
+                self.position.y > self.ParentComponent.position.y and 
+                self.endbound_position.x < self.ParentComponent.endbound_position.x and
+                self.endbound_position.y < self.ParentComponent.endbound_position.y
+            )
 end
 
 local Scrollbar = {
@@ -431,8 +462,8 @@ function Scrollbar:UpdateRelativePositions()
     self.position = self.SliderGroupObject.position + self.relative_position
     Component.UpdateRelativePositions(self)
     self.end_offset = math.floor(self.start_offset + self.scrollbar_length)
-
-    self.scrollbar_length = (math.abs(self.SliderGroupObject.endbound_position.x - self.SliderGroupObject.position.x) / self.SliderGroupObject.ContentSpaceSize) * math.abs(self.endbound_position.x - self.position.x)
+    
+    self.scrollbar_length = (math.abs(self.SliderGroupObject.MinimumSize) / self.SliderGroupObject.ContentSpaceSize) * math.abs(self.endbound_position.x - self.position.x)
     self.scrollbar_position_start.x = self.position.x + self.start_offset
     self.scrollbar_position_end.x = self.position.x + self.end_offset
 
@@ -480,19 +511,22 @@ ScrollbarInstance.SliderGroupObject = SliderGroupInstance
 BuildInstance:AddChild(SliderGroupInstance)
 BuildInstance:AddChild(ScrollbarInstance)
 
-for i=1,10 do
+for i=1,1000 do
     local SliderInstance = SliderComponent:new()
     SliderGroupInstance:AddChild(SliderInstance)
 end
 
+local MenuGroup = ui.create("Anti-Aim Builder")
 
+MenuGroup:button("Increment DistanceBetweenSliders", function()
+    SliderGroup.DistanceBetweenSliders =  SliderGroup.DistanceBetweenSliders + 1
+end)
+
+MenuGroup:button("Decrement DistanceBetweenSliders", function()
+    SliderGroup.DistanceBetweenSliders =  SliderGroup.DistanceBetweenSliders - 1
+end)
 events.render:set(
     function()
-        --if globals.tickcount % 128 == 0 then
-        --
-        --end
-
-
         BuildInstance:Tick()
         GlobalMouseState:MouseEventLoop()
         print("")
