@@ -679,8 +679,8 @@ function Math:AngleVectors(angles,forward)
     local cp = {}
     local cy = {}
 
-    self:XMScalarSinCos(sp,cp,math.rad(angles.x))
-    self:XMScalarSinCos(sy,cy,math.rad(angles.y))
+    self:XMScalarSinCos(sp,cp,math.rad(angles.x or angles.pitch))
+    self:XMScalarSinCos(sy,cy,math.rad(angles.y or angles.yaw))
 
     forward.x = cp[1] * cy[1]
     forward.y = cp[1] * sy[1]
@@ -697,9 +697,9 @@ function Math:AngleVectorsExtra(angles,forward,right,up)
     local cp = {}
     local cy = {}
 
-    self:XMScalarSinCos(sp,cp,math.rad(angles.x))
-    self:XMScalarSinCos(sy,cy,math.rad(angles.y))
-    self:XMScalarSinCos(sr,cr,math.rad(angles.z))
+    self:XMScalarSinCos(sp,cp,math.rad(angles.x or angles.pitch))
+    self:XMScalarSinCos(sy,cy,math.rad(angles.y or angles.yaw))
+    self:XMScalarSinCos(sr,cr,math.rad(angles.z or angles.roll))
 
 
     forward.x = cp[1] * cy[1]
@@ -776,8 +776,8 @@ function Math:SmoothAngle( from , to , percent ,smoothmethod,shouldRandomize)
         VecDelta.x = VecDelta.x * ( percent / 100.0 )
 	    VecDelta.y = VecDelta.y * ( percent / 100.0 )
     else
-        VecDelta.x = Math:Clamp(VecDelta.x,-(percent),(percent))
-	    VecDelta.y = Math:Clamp(VecDelta.y,-(percent),(percent))
+        VecDelta.x = Math:Clamp(VecDelta.x,-(percent / 10),(percent / 10))
+	    VecDelta.y = Math:Clamp(VecDelta.y,-(percent / 10),(percent / 10))
     end
 
 
@@ -1057,14 +1057,25 @@ ffi.cdef[[
     typedef bool(__thiscall* HasC4_FN )(uint32_t this);
 ]]
 
+local oHasC4 = ffi.cast("HasC4_FN",utils.opcode_scan("client.dll","56 8B F1 85 F6 74 31"))
 local function HasC4(PlayerPointer)
     if PlayerPointer then
-        return ffi.cast("HasC4_FN",utils.opcode_scan("client.dll","56 8B F1 85 F6 74 31"))(PlayerPointer)
+        return oHasC4(PlayerPointer)
     else
         return false
     end
 
 end
+
+ffi.cdef[[
+
+    typedef struct{
+        float x,y,z;
+    } Vector;
+    typedef bool(__cdecl* LineGoesThroughSmoke_FN)(Vector, Vector);
+]]
+
+local LineGoesThroughSmoke = ffi.cast("LineGoesThroughSmoke_FN",utils.opcode_scan("client.dll","55 8B EC 83 EC 08 8B 15 ? ? ? ? 0F 57 C0"))
 
 --alternatives : convar game_type and game_mode
 local g_GameTypes = ffi.cast("uint32_t",utils.create_interface("matchmaking.dll","VENGINE_GAMETYPES_VERSION002"))
@@ -1163,6 +1174,9 @@ Aimbot_Enable:set_tooltip("Global switch for the aimbot.")
 local Aimbot_SilentAim = Aimbot_MenuGroup:switch("Silent Aim",false)
 Aimbot_SilentAim:set_tooltip("Prevents the aiming angles from applying to your engine angles.")
 
+local Aimbot_SmokeCheck = Aimbot_MenuGroup:switch("Smoke Check",true)
+Aimbot_SmokeCheck:set_tooltip("Prevents shooting if enemy is behind smoke.")
+
 local BodyAim_Switch = Aimbot_MenuGroup:switch("Prefer body aim",true)
 BodyAim_Switch:set_tooltip("Prioritizes aiming for the body.If not possible,aim for the head.")
 
@@ -1180,11 +1194,13 @@ local Aimbot_Smoothing_Method = Aimbot_MenuGroup:combo("Smoothing Method",Aimbot
 Aimbot_Smoothing_Method:set_tooltip("Linear : the aimbot will have varying speeds.It will try to turn faster if the angle to target is bigger.Looks more obvious.\n\nConstant : it will turn at a constant speed regardless of how far the target angle is.Looks more robotic and slower but is more consistent.")
 
 local Aimbot_Default_Target_Combo_Table = {
+    "None",
     "Node",
-    "Random"
+    "Random",
+    "Closest enemy"
 }
 local Aimbot_Default_Target = Aimbot_MenuGroup:combo("Default Target",Aimbot_Default_Target_Combo_Table)
-Aimbot_Default_Target:set_tooltip("Default aiming direction if there's no enemy.")
+Aimbot_Default_Target:set_tooltip("Default aiming direction if there's no enemy.\n\nNone: Won't update the angle,will only aim at the last angle.\n\nNode: Aims at the next node in the path.\n\nRandom: Aims at a random angle.\n\nClosest enemy: Aims at the nearest enemy,will make you aim through walls.")
 
 
 -- local Aimbot_Hitchance = Menu.SliderInt("Aimbot","Aimbot","Hitchance",50,1,100,"Enforces more accuracy to the aimbot's shots.")
@@ -2315,14 +2331,17 @@ end
 
 local function IsVisible(FromPlayer,ToPlayer)
     local FromPlayer_EyePos = FromPlayer:get_eye_position()
-
+    local FromPlayer_EyePos_FFI = ffi.new("Vector",{FromPlayer_EyePos.x,FromPlayer_EyePos.y,FromPlayer_EyePos.z})
     if not BodyAim_Switch:get() then
         for _,hitbox in ipairs(Hitboxes_Normal) do
 
             local ToPlayer_TargetPos = ToPlayer:get_hitbox_position(hitbox)
+            local ToPlayer_TargetPos_FFI = ffi.new("Vector",{ToPlayer_TargetPos.x,ToPlayer_TargetPos.y,ToPlayer_TargetPos.z})
 
+            local IsThroughSmoke = LineGoesThroughSmoke(FromPlayer_EyePos_FFI,ToPlayer_TargetPos_FFI)
+            
             local trace_result = utils.trace_line(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
-            if (trace_result.entity and trace_result.entity:get_index() == ToPlayer:get_index()) then
+            if (trace_result.entity and trace_result.entity:get_index() == ToPlayer:get_index() and not(IsThroughSmoke and Aimbot_SmokeCheck:get()) ) then
                 return hitbox
             end
         end
@@ -2330,9 +2349,12 @@ local function IsVisible(FromPlayer,ToPlayer)
         for _,hitbox in ipairs(Hitboxes_BodyAim) do
 
             local ToPlayer_TargetPos = ToPlayer:get_hitbox_position(hitbox)
+            local ToPlayer_TargetPos_FFI = ffi.new("Vector",{ToPlayer_TargetPos.x,ToPlayer_TargetPos.y,ToPlayer_TargetPos.z})
+
+            local IsThroughSmoke = LineGoesThroughSmoke(FromPlayer_EyePos_FFI,ToPlayer_TargetPos_FFI)
 
             local trace_result = utils.trace_line(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
-            if(trace_result.entity and trace_result.entity:get_index() == ToPlayer:get_index())then
+            if (trace_result.entity and trace_result.entity:get_index() == ToPlayer:get_index() and not(IsThroughSmoke and Aimbot_SmokeCheck:get()) ) then
                 return hitbox
             end
         end
@@ -2348,7 +2370,7 @@ local function Aimbot__FindNearestPlayer(FromPlayer)
     local NearestPlayer = nil
     local BestHitbox = nil
     local FromPlayerEyePos = FromPlayer:get_eye_position()
-    local FromPlayerPos = Vector3D:new(FromPlayerEyePos.x,FromPlayerEyePos.y,FromPlayerEyePos.z)
+    local FromPlayerPos = Vector3D:NewCustom(FromPlayerEyePos)
 
 
     entity.get_players(true,false,function(Player)
@@ -2358,10 +2380,10 @@ local function Aimbot__FindNearestPlayer(FromPlayer)
 
             if Player:is_alive() and Player:is_enemy()  and TempHitboxChoice > -1 and Player.m_fImmuneToGunGameDamageTime == 0 then
 
-                local PlayerOrigin = Player:get_eye_position()
-                local PlayerPos = Vector3D:new(PlayerOrigin.x,PlayerOrigin.y,PlayerOrigin.z)
+                local PlayerOrigin = Player:get_origin()
+                local PlayerPos = Vector3D:NewCustom(PlayerOrigin)
 
-                local DistanceToFromPlayer = PlayerPos:DistToSqr(FromPlayerPos) -- squared
+                local DistanceToFromPlayer = PlayerPos:DistTo2D(FromPlayerPos) -- squared
                 if( DistanceToFromPlayer < NearestDistance) then
                     NearestDistance = DistanceToFromPlayer
                     NearestPlayer = Player
@@ -2378,6 +2400,39 @@ local function Aimbot__FindNearestPlayer(FromPlayer)
     return  { NearestPlayer , BestHitbox }
 end
 
+local function DefaultTarget__FindNearestPlayer(FromPlayer)
+
+    local NearestDistance = math.huge
+    local NearestPlayer = nil
+
+    local FromPlayerEyePos = FromPlayer:get_eye_position()
+    local FromPlayerPos = Vector3D:NewCustom(FromPlayerEyePos)
+
+
+    entity.get_players(true,true,function(Player)
+
+        if Player ~= FromPlayer then
+
+            if Player:is_alive() and Player:is_enemy() and Player.m_fImmuneToGunGameDamageTime == 0 then
+
+                local PlayerOrigin = Player:get_origin()
+                local PlayerPos = Vector3D:NewCustom(PlayerOrigin)
+
+                local DistanceToFromPlayer = PlayerPos:DistTo2D(FromPlayerPos)
+                if( DistanceToFromPlayer < NearestDistance) then
+                    NearestDistance = DistanceToFromPlayer
+                    NearestPlayer = Player
+                end
+            end
+
+        end
+
+
+
+    end)
+
+    return NearestPlayer
+end
 local StartingNode = nil
 local EndArea = nil
 local CurrentNode = nil
@@ -2915,38 +2970,36 @@ local function CheckHitchancePrecomputed(angleToTarget,TargetEntity)
     return false
 end
 
-local function CheckHitchanceIntersect(cmd,EntityAddress,angleToTarget,hitbox_id)
+local function CheckHitchanceIntersect(EntityAddress,angleToTarget,hitbox_id)
 
     local local_player  = entity.get_local_player()
     local weapon        = local_player:get_player_weapon()
 
-    local lp_eyepos     = local_player:get_eye_position()
-
     local hitboxbounds = GetHitboxBounds(EntityAddress,hitbox_id)
 
-    local forward             = Vector3D:new()
-    local right                 = Vector3D:new()
-    local up                    = Vector3D:new()
+    local start         = Vector3D:NewCustom(local_player:get_eye_position())
 
-    Math:AngleVectorsExtra(angleToTarget,forward,right,up)
+    local spread            =   weapon:get_spread()
+    local inaccuracy        =   weapon:get_inaccuracy()
 
-    local spread            = weapon:get_spread()
-    local inaccuracy        = weapon:get_inaccuracy()
+    local spreadAngle       = math.deg(spread + inaccuracy)
 
-    local needed_hits   =  math.ceil((Aimbot_Hitchance:get() / 100) * 255)
+
+    local needed_hits       =  math.ceil((Aimbot_Hitchance:get() / 100) * 255)
     local total_hits        = 0
 
     for i = 1,255 do
-        local wep_spread = CalculateSpread(weapon,i,inaccuracy,spread,false,cmd.random_seed)
 
-        local dir = Vector3D:new(
-            forward.x + (right.x * wep_spread.x) + (up.x * wep_spread.y),
-            forward.y + (right.y * wep_spread.x) + (up.y * wep_spread.y),
-            forward.z + (right.z * wep_spread.x) + (up.z * wep_spread.y)
-        )
+        local ratio         = (i / 255)
+        local multiplier    = ratio * spreadAngle
+        local spreadDir     = math.sqrt(ratio) * Math.PI * 30
+        local spreadAngle   = Angle:new( math.cos(spreadDir) * multiplier, math.sin(spreadDir) * multiplier, 0 )
+        local shotAngle     = Angle:NewCustom(angleToTarget) + spreadAngle
+        local forward       = Vector3D:new()
+        Math:AngleVectors(shotAngle,forward)
 
         if hitboxbounds and hitboxbounds[1] and hitboxbounds[2] and hitboxbounds[3] then
-            if Math:DoesIntersectCapsule(Vector3D:NewCustom(lp_eyepos),dir,hitboxbounds[1],hitboxbounds[2],hitboxbounds[3]) then
+            if Math:DoesIntersectCapsule(start,forward,hitboxbounds[1],hitboxbounds[2],hitboxbounds[3]) then
                 total_hits = total_hits + 1
             end
         end
@@ -2955,7 +3008,9 @@ local function CheckHitchanceIntersect(cmd,EntityAddress,angleToTarget,hitbox_id
             return true
         end
     end
+
     return false
+
 end
 
 local function CheckHitchanceRandom(cmd,angleToTarget,TargetEntity)
@@ -3228,7 +3283,7 @@ local function PrepareTargetAngle(cmd)
                             end
                         end
                     end
-                else
+                elseif Aimbot_Default_Target:get() == "Random" then
 
                     local difference = math.abs((LatestAngle.y - LatestTargetAngle.y + 540) % 360 - 180)
                     if (difference <= 1) and ((globals.tickcount * globals.tickinterval ) % 1 == 0) then
@@ -3236,6 +3291,17 @@ local function PrepareTargetAngle(cmd)
                         LatestTargetAngle.y = math.random(-180,180)
                         LatestTargetAngle.z = 0.00
                     end
+                elseif Aimbot_Default_Target:get() == "Closest enemy" then
+
+                    local NearestPlayer = DefaultTarget__FindNearestPlayer(local_player)
+                    if not NearestPlayer then return end
+                    local AngleToThreat = Math:CalcAngle(local_player_pos,NearestPlayer:get_origin())
+                    if not AngleToThreat then return end
+
+                    AngleToThreat:NormalizeTo180()
+                    LatestTargetAngle.x = 0.0
+                    LatestTargetAngle.y = AngleToThreat.y
+                    LatestTargetAngle.z = 0.00
                 end
             end
         end
@@ -3288,7 +3354,7 @@ local function Aimbot(cmd)
                     cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
                 end
             else
-                if CheckHitchanceIntersect(cmd,ffi.cast("uint32_t",TargetInfo[1][0]),LatestAngle,TargetInfo[2]) then
+                if CheckHitchanceIntersect(ffi.cast("uint32_t",TargetInfo[1][0]),LatestAngle,TargetInfo[2]) then
                     if Aimbot_Enforce_Hitbox:get() then
                         cmd.view_angles.x = LatestTargetAngle.x
                         cmd.view_angles.y = LatestTargetAngle.y
