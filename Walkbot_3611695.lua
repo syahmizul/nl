@@ -879,7 +879,7 @@ function Math:VectorTransform(in1,in2,out)
     out.z = in1:Dot(Vector3D:new(in2[2][0],in2[2][1],in2[2][2])) + in2[2][3]
 end
 
-local pGetModuleHandle_sig = ffi.cast("uint32_t",utils.opcode_scan("engine.dll", " FF 15 ? ? ? ? 85 C0 74 0B"))
+local pGetModuleHandle_sig = ffi.cast("uint32_t",utils.opcode_scan("engine.dll", "FF 15 ? ? ? ? 85 C0 74 0B"))
 local pGetModuleHandle = ffi.cast("uint32_t**", ffi.cast("uint32_t", pGetModuleHandle_sig) + 2)[0][0]
 local fnGetModuleHandle = ffi.cast("uint32_t(__stdcall*)(const char*)", pGetModuleHandle)
 
@@ -926,7 +926,7 @@ end
 local function GetHitboxSet(studiohdr,i)
     local studiohdr_ptr = ffi.cast("uint32_t*",studiohdr)
     local studiohdr_raw = ffi.cast("uint32_t",studiohdr)
-    
+
     if i > ffi.cast("int32_t*",studiohdr_raw + 0x00AC)[0] then
         return nil
     end
@@ -937,12 +937,12 @@ end
 local function GetHitbox(hitboxset,i)
     local hitboxset_ptr = ffi.cast("uint32_t*",hitboxset)
     local hitboxset_raw = ffi.cast("uint32_t",hitboxset)
-    
+
     if i > ffi.cast("int32_t*",hitboxset_raw + 0x4)[0] then
         return nil
     end
     local hitboxsetindex = ffi.cast("int32_t*",hitboxset_raw + 0x8 )[0]
-    
+
     return ffi.cast("uint32_t",hitboxset_raw + hitboxsetindex + (i * 68))
 end
 
@@ -1009,7 +1009,7 @@ ffi.cdef[[
     int         OpenProcessToken(uint32_t ProcessHandle,uint32_t DesiredAccess,uint32_t* TokenHandle);
     int         OpenThreadToken(uint32_t ThreadHandle,uint32_t DesiredAccess,int OpenAsSelf,uint32_t* TokenHandle);
     int         ImpersonateLoggedOnUser(uint32_t hToken);
-    typedef struct 
+    typedef struct
     {
         uint32_t  nLength;
         uint32_t* lpSecurityDescriptor;
@@ -1046,7 +1046,7 @@ local function GetGameState()
     return g_GameState[0]
 end
 
-local clientStatePtr = ffi.cast("uint32_t*",fnGetModuleHandle("engine.dll") + 5820380)[0]
+local clientStatePtr = ffi.cast("uint32_t*",fnGetModuleHandle("engine.dll") + 0x59F194)[0]
 
 local function GetSignOnState()
     local SignOnState = ffi.cast("uint32_t*",(clientStatePtr + 264))[0]
@@ -2123,7 +2123,7 @@ local function LoadMap(MapName)
 
     local fileHandle = ffi.C.CreateFileA(MapConcattedWithDirectory,0x80000000,0x00000001,0,3,0x80,0)
 
-    
+
     if fileHandle == 0xFFFFFFFF then
         print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\aFF0000 CreateFileA returned an invalid handle.")
         print_raw("\a3244A8[\aBAAE3FWalkbot\a3244A8]\aFF0000 GetLastError : " .. ffi.C.GetLastError() .. " . Report this error code to me on Discord : SilverHawk21#0001 for further assist.")
@@ -2339,7 +2339,7 @@ local function IsVisible(FromPlayer,ToPlayer)
             local ToPlayer_TargetPos_FFI = ffi.new("Vector",{ToPlayer_TargetPos.x,ToPlayer_TargetPos.y,ToPlayer_TargetPos.z})
 
             local IsThroughSmoke = LineGoesThroughSmoke(FromPlayer_EyePos_FFI,ToPlayer_TargetPos_FFI)
-            
+
             local trace_result = utils.trace_line(FromPlayer_EyePos, ToPlayer_TargetPos, FromPlayer, 0x46004003)
             if (trace_result.entity and trace_result.entity:get_index() == ToPlayer:get_index() and not(IsThroughSmoke and Aimbot_SmokeCheck:get()) ) then
                 return hitbox
@@ -2454,7 +2454,7 @@ local function PrepareToFindAnotherNode()
     local local_player = entity.get_local_player()
 
     if not local_player then return end
-    
+
     StartingNode = AreaNode:new()
     StartingNode.area = FindNearestAreaToPlayer(INavFile.m_areas,local_player)
 
@@ -2808,7 +2808,7 @@ local function ObstacleAvoid(cmd)
 
     if(local_player_speed >= 0.10 * max_speed) then
         MovingTicks = (MovingTicks + 1) % 6400
-        
+
         if((MovingTicks * globals.tickinterval) % ThresholdTimeReset:get() == 0) then
             CycleAttempt = 0
         end
@@ -2817,7 +2817,7 @@ local function ObstacleAvoid(cmd)
         NotMovingTicks = (NotMovingTicks + 1) % 6400
         MovingTicks = 1
     end
-    
+
     if ((globals.tickcount * globals.tickinterval) % ThresholdTimeReset:get() == 0) then
         CycleAttempt = CycleAttempt % CycleMethods + 1
     end
@@ -3325,7 +3325,7 @@ local function Aimbot(cmd)
     cmd.view_angles.y = LatestAngle.y
 
     if TargetInfo and TargetInfo[1][0] and TargetInfo[2] then
-        
+
         local Hitchance_Method = GetIndexFromSelectedCombo(Aimbot_Hitchance_Method_Combo_Table,Aimbot_Hitchance_Method:get())
 
         if TargetInfo[1] and CanLocalPlayerShoot() and CanHit_Angle(local_player_pos,Angle:NewCustom(cmd.view_angles),local_player,TargetInfo[1]) and bit.band(cmd.buttons,buttons.IN_ATTACK2) == 0 then
@@ -3362,7 +3362,7 @@ local function Aimbot(cmd)
                     cmd.buttons = bit.bor(cmd.buttons,buttons.IN_ATTACK)
                 end
             end
-            
+
         end
 
     end
@@ -3511,7 +3511,7 @@ events.createmove:set(function(cmd)
 
                 xpcall(MoveToTarget, ErrorHandler,cmd)
                 -- MoveToTarget(cmd)
-                
+
                 if TimeSinceLastSeenEnemy * globals.tickinterval > TimeToMove:get() then
                     xpcall(ObstacleAvoid, ErrorHandler,cmd)
                     -- ObstacleAvoid(cmd)
@@ -3547,31 +3547,31 @@ end)
 
 
 local AutoQueuePanorama = panorama.loadstring([[
-    function queueMatchmaking() 
+    function queueMatchmaking()
         {
-            if (!LobbyAPI.BIsHost()) 
+            if (!LobbyAPI.BIsHost())
             {
                 LobbyAPI.CreateSession();
             }
-            if 
+            if
             (
-                !( 
-                    GameStateAPI.IsConnectedOrConnectingToServer() || 
-                    LobbyAPI.GetMatchmakingStatusString() || 
+                !(
+                    GameStateAPI.IsConnectedOrConnectingToServer() ||
+                    LobbyAPI.GetMatchmakingStatusString() ||
                     ( CompetitiveMatchAPI.GetCooldownSecondsRemaining() > 0 && LobbyAPI.GetSessionSettings().game.type == "classic" && LobbyAPI.GetSessionSettings().game.mode == "competitive" && LobbyAPI.GetSessionSettings().options.server == "official") ||
                     CompetitiveMatchAPI.HasOngoingMatch()  ||
-                    GameStateAPI.IsLocalPlayerPlayingMatch() || 
+                    GameStateAPI.IsLocalPlayerPlayingMatch() ||
                     GameStateAPI.IsLocalPlayerWatchingOwnDemo()
-                ) 
-            ) 
+                )
+            )
             {
                 $.Msg("StartMatchmaking");
                 LobbyAPI.StartMatchmaking("", "", "", "");
             }
-            
+
         }
-    
-        queueMatchmaking();	
+
+        queueMatchmaking();
 ]])
 
 
@@ -3597,7 +3597,7 @@ end
 events.post_render:set(function()
     local local_player = entity.get_local_player()
 
-    
+
 
     if (globals.tickcount * globals.tickinterval) % 1 == 0 then
         if local_player and not (local_player.m_iTeamNum == 2 or local_player.m_iTeamNum == 3 ) and (IGameTypes:GetCurrentGameMode() == 2 and IGameTypes:GetCurrentGameType() == 1) then
