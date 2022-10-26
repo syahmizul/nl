@@ -1146,7 +1146,7 @@ local IterationPerTick_Slider = Walkbot_MenuGroup:slider("Path finding iteration
 IterationPerTick_Slider:set_tooltip("Increasing this will make the path finding faster,at the cost of your FPS.")
 
 local Difference2DLimit = Walkbot_MenuGroup:slider("Distance to node limit",1.0,500.0,20.0,1)
-Difference2DLimit:set_tooltip("Increasing this will make the path finding faster,at the cost of your FPS.")
+Difference2DLimit:set_tooltip("If the distance to the current node goes BELOW this number,THEN you are considered to arrive at the node,and you will start moving to the next node in the path.")
 
 local Z_Limit = Walkbot_MenuGroup:slider("Distance to node Z-limit",1.0, 500.0,50.0,1.0)
 Z_Limit:set_tooltip("Same as above,but this controls the z limit.This needs to be more loose since its hard to accurately get to the z position of the node.")
